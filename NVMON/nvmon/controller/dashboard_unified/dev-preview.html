@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>nvmon — 7/8 online</title>
+
+  <link rel="stylesheet" href="static/css/nvmon.css">
+
+  
+  <script src="static/vendor/htmx.min.js" defer></script>
+  <script src="static/vendor/alpine.min.js" defer></script>
+  <script src="static/vendor/chart.umd.js" defer></script>
+
+  
+  <script type="module" src="static/js/charts.js"></script>
+  <script type="module" src="static/js/nvmon.js"></script>
+
+  
+</head>
+<body>
+<script>window.__nvmonNoSSE = true;</script>
+
+  <a class="skip-link" href="#nodes">Skip to nodes</a>
+
+  
+  <header class="hdr" role="banner">
+    <div class="hdr-brand" aria-label="nvmon by REM">
+      <span class="hdr-brand-title">
+        <span class="hdr-brand-name">nvmon</span>
+        <span class="hdr-brand-sub">by REM</span>
+      </span>
+    </div>
+
+    <nav class="hdr-counters" aria-live="polite" aria-label="Cluster counters">
+      <span><span class="cnt ok" data-counter="online">7</span>/<span data-counter="total">8</span> online</span>
+      <span>
+        
+          <span class="cnt crit" data-counter="alerts">2</span> alerts
+        
+      </span>
+    </nav>
+
+    <div class="hdr-actions">
+      
+  <span class="ctx" x-data x-text="$store.nvmon.scopeLabel()"></span>
+  <button class="btn btn-primary" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('apply', {reapplyActive: true})"
+          title="Re-apply each node's active profile (A)">
+    Re-apply All
+  </button>
+  <button class="btn" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('sync')"
+          title="Sync All (S)">
+    Sync All
+  </button>
+  <button class="btn btn-danger btn-sm" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('restore')"
+          title="Restore All">
+    Restore
+  </button>
+  <button class="btn btn-icon btn-ghost" type="button"
+          x-data
+          @click="$store.nvmon.forceRefresh()"
+          aria-label="Reconnect stream (R)" title="Reconnect (R)">⟳</button>
+
+    </div>
+  </header>
+  
+
+  <main id="main" role="main">
+    
+  
+  <section aria-label="Alert banner"
+           x-data="{ top: $store.nvmon.topAlert }"
+           id="alert-banner">
+    
+      
+      <div class="alert-banner crit"
+           role="alert" aria-live="assertive" data-alert-id="a-4821">
+        <span class="sev">CRITICAL</span>
+        <span class="host">RN-02</span>
+        <span class="msg">QSync Lost — House sync signal dropped at 10:22:14</span>
+        <span class="ts">10:22:14</span>
+        <span class="actions">
+          <button class="btn btn-sm" type="button"
+                  x-data
+                  @click="$store.nvmon.gotoNode('RN-02')">Go to node</button>
+          <button class="btn btn-sm btn-ghost" type="button"
+                  hx-post="/alerts/a-4821/dismiss"
+                  hx-swap="outerHTML"
+                  hx-target="closest .alert-banner">Dismiss</button>
+        </span>
+      </div>
+    
+  </section>
+
+  
+  <div class="tabbar" role="tablist" aria-label="Node groups">
+    <div class="tabs">
+      <button class="tab" role="tab"
+              x-data
+              @click="$store.nvmon.setGroup('all')"
+              :aria-selected="$store.nvmon.group === 'all'"
+              data-group="all">
+        All <span class="count">8</span>
+      </button>
+      
+        <button class="tab" role="tab"
+                x-data
+                @click="$store.nvmon.setGroup('outputs')"
+                :aria-selected="$store.nvmon.group === 'outputs'"
+                data-group="outputs">
+          outputs <span class="count">4</span>
+        </button>
+      
+        <button class="tab" role="tab"
+                x-data
+                @click="$store.nvmon.setGroup('backups')"
+                :aria-selected="$store.nvmon.group === 'backups'"
+                data-group="backups">
+          backups <span class="count">2</span>
+        </button>
+      
+        <button class="tab" role="tab"
+                x-data
+                @click="$store.nvmon.setGroup('dev')"
+                :aria-selected="$store.nvmon.group === 'dev'"
+                data-group="dev">
+          dev <span class="count">2</span>
+        </button>
+      
+    </div>
+    <div class="spacer"></div>
+    <div class="view-toggle" role="group" aria-label="View toggle">
+      <button type="button"
+              x-data
+              @click="$store.nvmon.setView('grid')"
+              :aria-pressed="$store.nvmon.view === 'grid'">Grid</button>
+      <button type="button"
+              x-data
+              @click="$store.nvmon.setView('list')"
+              :aria-pressed="$store.nvmon.view === 'list'">List</button>
+    </div>
+    <div class="filter">
+      <label for="node-filter" class="sr-only">Filter nodes</label>
+      <input id="node-filter" type="search" placeholder="Filter (/)"
+             x-data
+             @input="$store.nvmon.setFilter($event.target.value)">
+    </div>
+  </div>
+
+  
+  <section id="nodes"
+           class="node-grid"
+           role="list"
+           aria-label="Render nodes"
+           x-data="nodeGrid()">
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-01"
+               data-group="outputs"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-01"
+               hx-get="/node/RN-01/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-01" class="node-host">RN-01</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="ok"
+                  title="QSync: locked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 58 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="55,56,57,58,58,59,60,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 58&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>2.0s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-01', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-02"
+               data-group="outputs"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-02"
+               hx-get="/node/RN-02/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-02" class="node-host">RN-02</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+              <span class="warn-tag" aria-label="1 alerts">[!]</span>
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="crit"
+                  title="QSync: unlocked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 62 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="60,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,62"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 62&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>1.0s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-02', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-03"
+               data-group="backups"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-03"
+               hx-get="/node/RN-03/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-03" class="node-host">RN-03</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="ok"
+                  title="QSync: locked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 55 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,55"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 55&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>2.0s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-03', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+      
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-04"
+               data-group="dev"
+               data-online="false"
+               data-level="ok"
+               aria-labelledby="host-RN-04"
+               hx-get="/node/RN-04/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-04" class="node-host">RN-04</span>
+          <span class="node-status offline">
+            OFFLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub muted">unreachable</div>
+          <div class="node-meta muted"><span>last seen</span><span>2026-04-17T10:21:58Z</span></div>
+        
+
+        <div class="node-foot">
+          <span>—</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-04', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-05"
+               data-group="outputs"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-05"
+               hx-get="/node/RN-05/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-05" class="node-host">RN-05</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="ok"
+                  title="QSync: locked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 60 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="58,59,60,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,60,60,60,60"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 60&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>1.5s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-05', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-06"
+               data-group="outputs"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-06"
+               hx-get="/node/RN-06/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-06" class="node-host">RN-06</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="ok"
+                  title="QSync: locked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 63 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="60,61,62,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,63,63,63,63"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 63&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>2.5s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-06', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-07"
+               data-group="backups"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-07"
+               hx-get="/node/RN-07/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-07" class="node-host">RN-07</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            mosaic-2397
+            
+              <span class="warn-tag" aria-label="1 alerts">[!]</span>
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="ok"
+                  title="DirectDisplay: active">DD</span>
+            <span class="dot" data-level="ok"
+                  title="Mosaic: 2x2">MOS</span>
+            <span class="dot" data-level="ok"
+                  title="QSync: locked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>4 displays</span>
+            <span>@23.976Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 86 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="78,79,80,81,82,83,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,86,86,86"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp crit">GPU 86&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>3.0s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-07', $event)">⋮</button>
+        </div>
+      </article>
+    
+      
+      
+        
+      
+        
+      
+        
+      
+      
+        
+          
+        
+          
+        
+          
+        
+      
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="RN-08"
+               data-group="dev"
+               data-online="true"
+               data-level="ok"
+               aria-labelledby="host-RN-08"
+               hx-get="/node/RN-08/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-RN-08" class="node-host">RN-08</span>
+          <span class="node-status ">
+            ONLINE
+          </span>
+        </div>
+
+        
+          <div class="node-sub">
+            desktop
+            
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="warn"
+                  title="DirectDisplay: inactive">DD</span>
+            <span class="dot" data-level="warn"
+                  title="Mosaic: off">MOS</span>
+            <span class="dot" data-level="warn"
+                  title="QSync: unlocked">QS</span>
+          </div>
+
+          <div class="node-meta">
+            <span>2 displays</span>
+            <span>@60.000Hz</span>
+          </div>
+
+          
+            
+            
+            <div class="node-spark" aria-label="GPU 0 temperature 45 Celsius">
+              <svg class="sparkline" width="120" height="24"
+                   data-sparkline="44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,45"
+                   data-min="40" data-max="95"
+                   viewBox="0 0 120 24" aria-hidden="true">
+                <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                          points="" />
+              </svg>
+              <span class="temp ok">GPU 45&deg;C</span>
+            </div>
+          
+        
+
+        <div class="node-foot">
+          <span>1.0s ago</span>
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('RN-08', $event)">⋮</button>
+        </div>
+      </article>
+    
+  </section>
+
+  </main>
+
+  
+  <footer class="ftr" role="contentinfo">
+    <span>Controller v0.1.0 &middot; 8 nodes &middot; last aggregate 2026-04-17T10:22:34Z</span>
+    <span class="stream-state" data-state="live" aria-live="polite">
+      stream: <span data-stream-state>live</span>
+    </span>
+  </footer>
+  
+
+  
+  <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+
+  
+  
+  
+  <div id="slideover-portal" aria-live="polite"></div>
+
+  
+  <div id="modal-portal" aria-live="polite"></div>
+
+  
+  <script id="profiles-data" type="application/json">["mosaic-2397", "desktop", "mosaic-1080p"]</script>
+  <script id="groups-data"   type="application/json">[{"count": 4, "name": "outputs", "nodes": ["RN-01", "RN-02", "RN-05", "RN-06"]}, {"count": 2, "name": "backups", "nodes": ["RN-03", "RN-07"]}, {"count": 2, "name": "dev", "nodes": ["RN-04", "RN-08"]}]</script>
+
+
+</body>
+</html>

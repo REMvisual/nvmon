@@ -1,0 +1,14 @@
+Display Adapters
+  Adapter |                   |   Can  |
+   Index  |    OS AdapterId   | Manage | Adapter Name
+  --------+-------------------+--------+--------------------------------
+        0 | 00000000-00013a0d |   Yes  | NVIDIA RTX A6000
+        1 | 00000000-00012433 |   Yes  | NVIDIA RTX A6000
+        2 | 00000000-00014c73 |    No  | Microsoft Basic Render Driver
+
+Displays
+  Display | Adapter |   NVAPI   |    OS    |                                    |    Source    |
+   Index  |  Index  | DisplayId | TargetId |               Status               |  Resolution  | Display Name
+  --------+---------+-----------+----------+------------------------------------+--------------+-------------
+        0 |    0    |  80061082 |    41101 |           Desktop @(0,0)           | 1920 x 1080  | DDX-101
+        1 |    1    |  8206108b |    61400 |   Removed, Managed, Not Acquired   | 7680 x 4320  | HELIOS-DP

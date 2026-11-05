@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>nvmon — sign in</title>
+  <link rel="stylesheet" href="{{ static_url }}/css/nvmon.css">
+</head>
+<body class="login-page">
+  <main class="login-card" role="main">
+    <h1>nvmon controller</h1>
+    <div class="sub">Enter the shared password to continue.</div>
+
+    {#
+      POST /login with form-encoded `password` field.
+      Controller sets a non-expiring cookie on success, 401 on bad.
+      See routes.py for the contract.
+    #}
+    <form method="post" action="/login" autocomplete="off" novalidate>
+      <label for="pw">Password</label>
+      <input id="pw" name="password" type="password"
+             autofocus autocomplete="current-password"
+             aria-describedby="err-msg"
+             required>
+
+      <div id="err-msg" class="err" role="alert" aria-live="polite">
+        {% if error %}{{ error }}{% endif %}
+      </div>
+
+      {# Preserve the destination the operator was trying to reach. #}
+      {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </main>
+</body>
+</html>

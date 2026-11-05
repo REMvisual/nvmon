@@ -1,0 +1,4 @@
+0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 00000000:01:00.0, 596.86, 54, 312.40, 600.00, 97, 81204, 97887, 2617, 14001, 2250, P0, Enabled, 48, 5, 16
+1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 00000000:21:00.0, 596.86, 51, 298.11, 600.00, 95, 80988, 97887, 2602, 14001, 2250, P0, Enabled, 46, 5, 16
+2, NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition, 00000000:41:00.0, 596.86, 61, 288.05, 300.00, 93, 80104, 97887, 2100, 14001, 2010, P0, Disabled, [N/A], 5, 16
+3, NVIDIA RTX PRO 6000 Blackwell Server Edition, 00000000:61:00.0, 596.86, 58, [N/A], 600.00, 0, 0, 97887, 210, 405, 555, P8, Disabled, N/A, 5, 8

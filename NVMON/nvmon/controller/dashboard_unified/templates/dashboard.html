@@ -1,0 +1,572 @@
+{% extends "layout.html" %}
+
+{% block title %}nvmon — {{ controller.nodes_online }}/{{ controller.nodes_online + controller.nodes_offline }} online{% endblock %}
+
+{# v0.9.10 Fix hints — list body, rendered in the header dropdown on page
+   load and again (hidden) inside #fleet so the 45 s soft refresh can copy
+   a fresh list into the header (nvmon.js, htmx:afterSwap). #}
+{% macro fix_hints_list(nodes) -%}
+  {% set hint_nodes = nodes | selectattr('remedies') | list %}
+  {% if not hint_nodes %}
+    <div class="muted fix-hints-empty">Nothing stuck that nvmon recognises.</div>
+  {% endif %}
+  {% for n in hint_nodes %}
+    {% for r in n.remedies %}
+      <div class="fix-hint" data-action="{{ r.action }}">
+        <div class="fix-hint-top">
+          <span class="fix-hint-action">{{ (r.action or '') | upper }}</span>
+          <span class="fix-hint-node">{{ n.hostname }}{% if r.target %} · {{ r.target }}{% endif %}</span>
+        </div>
+        <div class="fix-hint-title">{{ r.title }}</div>
+        <div class="fix-hint-detail">{{ r.detail }}</div>
+        {% if r.evidence %}<div class="fix-hint-evidence mono">{{ r.evidence }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% endfor %}
+{%- endmacro %}
+{% set hint_count = nodes | selectattr('remedies') | map(attribute='remedies') | map('length') | sum %}
+
+{% block header_actions %}
+  <span class="ctx" x-data x-text="$store.nvmon.scopeLabel()"></span>
+  {# Fix hints dropdown — soft suggestions for states the buttons can't
+     fix (restart a node / reseat a cable / re-apply). Amber with a count
+     when something matches; click to drop the list down. #}
+  <div class="fix-hints-menu" x-data="{ open: false }" @click.outside="open = false">
+    <button type="button" id="fix-hints-btn"
+            class="btn btn-ghost fix-hints-btn {{ 'has' if hint_count else '' }}"
+            @click="open = !open" :aria-expanded="open" aria-haspopup="true"
+            title="Known stuck states and the manual fix (restart / reseat / re-apply)">
+      &#9888; Fix hints<span data-hints-count>{% if hint_count %} ({{ hint_count }}){% endif %}</span>
+    </button>
+    <div class="fix-hints-panel" x-show="open" x-cloak x-transition.opacity role="dialog" aria-label="Fix hints">
+      <div class="fix-hints-head">
+        <strong>Fix hints</strong>
+        <span class="muted">suggestions for states the buttons can't fix — check before acting</span>
+      </div>
+      <div id="fix-hints-body">{{ fix_hints_list(nodes) }}</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('apply', {reapplyActive: true})"
+          title="Re-apply each node's active profile (A)">
+    Re-apply All
+  </button>
+  {# Template — switch the whole scope to another profile set (rate /
+     variant). Each node gets its own ROLE's profile for the picked
+     template, per the {template} patterns in [controller.node_profiles].
+     Distinct shade so it can't be confused with Re-apply All. #}
+  <button class="btn btn-template" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('template')"
+          title="Switch to a profile template — host/client per node (T)">
+    Template
+  </button>
+  <button class="btn" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('sync')"
+          title="Sync All (S)">
+    Sync All
+  </button>
+  {# Restore = back to the Windows desktop (DD off, Mosaic off, QSync
+     off, active profile cleared). Only rendered when some node actually
+     runs DD or Mosaic (controller.restore_relevant) — on a desktop-only /
+     QSync-only rig like site it just kills sync. Still behind the advanced
+     ("by REM") toggle on rigs where it does render. #}
+  {% if controller.restore_relevant %}
+  <button class="btn btn-danger btn-sm rem-gated" type="button"
+          x-data
+          @click="$store.nvmon.openFanout('restore')"
+          title="Restore All — return every node to the Windows desktop and drop its active profile">
+    Restore
+  </button>
+  {% endif %}
+  <button class="btn btn-icon btn-ghost" type="button"
+          x-data
+          @click="$store.nvmon.forceRefresh()"
+          aria-label="Reconnect stream (R)" title="Reconnect (R)">⟳</button>
+
+  {# Power menu — restart / shutdown the whole fleet. Hidden behind a
+     small ⏻ icon (ghost styling, no label) so it can't be hit by
+     accident.  Two-step window.confirm chain in JS guards the click;
+     the menu itself just dispatches.  Click-outside closes the menu. #}
+  <div class="power-menu" x-data="{ open: false }" @click.outside="open = false"
+       style="position:relative; display:inline-block;">
+    <button class="btn btn-icon btn-ghost" type="button"
+            @click="open = !open"
+            :aria-expanded="open"
+            aria-haspopup="menu"
+            aria-label="Power menu (restart/shutdown fleet)"
+            title="Power…">⏻</button>
+    <div class="power-menu-list" x-show="open" x-cloak x-transition.opacity
+         role="menu"
+         style="position:absolute; right:0; top:calc(100% + 4px); z-index:50;
+                background:var(--surface); border:1px solid var(--border);
+                border-radius:var(--radius); box-shadow:0 4px 16px rgba(0,0,0,0.5);
+                min-width:220px; padding:4px 0;">
+      <button class="power-menu-item rem-gated" type="button" role="menuitem"
+              @click="open = false; $store.nvmon.openPower('restart_listener')"
+              style="display:block; width:100%; text-align:left; padding:8px 14px;
+                     background:none; border:none; color:var(--text);
+                     font-family:inherit; font-size:13px; cursor:pointer;"
+              onmouseover="this.style.background='var(--surface-lo)'"
+              onmouseout="this.style.background='none'"
+              title="Bounce the listener process on every node — picks up freshly-mirrored code without rebooting Windows">
+        Restart all listeners (no OS reboot)
+      </button>
+      <button class="power-menu-item rem-gated" type="button" role="menuitem"
+              @click="open = false; $store.nvmon.restartMonitor()"
+              style="display:block; width:100%; text-align:left; padding:8px 14px;
+                     background:none; border:none; color:var(--text);
+                     font-family:inherit; font-size:13px; cursor:pointer;"
+              onmouseover="this.style.background='var(--surface-lo)'"
+              onmouseout="this.style.background='none'"
+              title="Bounce the controller on this monitor box — kill_monitor.bat then run_monitor.bat (comes back minimized). Picks up freshly-mirrored controller code; nodes untouched, no OS reboot. This page reloads itself when the controller is back.">
+        Restart monitor (controller, no OS reboot)
+      </button>
+      <button class="power-menu-item" type="button" role="menuitem"
+              @click="open = false; $store.nvmon.openPower('restart')"
+              style="display:block; width:100%; text-align:left; padding:8px 14px;
+                     background:none; border:none; color:var(--crit);
+                     font-family:inherit; font-size:13px; cursor:pointer;"
+              onmouseover="this.style.background='var(--surface-lo)'"
+              onmouseout="this.style.background='none'">
+        Restart all machines…
+      </button>
+      <button class="power-menu-item" type="button" role="menuitem"
+              @click="open = false; $store.nvmon.openPower('shutdown')"
+              style="display:block; width:100%; text-align:left; padding:8px 14px;
+                     background:none; border:none; color:var(--crit);
+                     font-family:inherit; font-size:13px; cursor:pointer;"
+              onmouseover="this.style.background='var(--surface-lo)'"
+              onmouseout="this.style.background='none'">
+        Shutdown all machines…
+      </button>
+    </div>
+  </div>
+
+  {# Per-subsystem visibility toggles. Default off; persists in
+     localStorage so each choice survives reloads. Gated behind the REM
+     toggle alongside the other advanced controls.
+     Cards force-show on a given node when that subsystem is actually
+     doing work — the server omits the `optional` class in that case, so
+     these toggles only affect idle/unused cards. #}
+  <span class="ctx rem-gated" style="display:inline-flex; gap:10px; align-items:center;">
+    <label style="display:inline-flex; gap:4px; align-items:center; cursor:pointer;"
+           title="Show DirectDisplay card on nodes where DD is idle">
+      <input type="checkbox"
+             x-data="{ on: localStorage.getItem('nvmon-show-dd') === '1' }"
+             x-init="document.body.classList.toggle('show-dd', on)"
+             x-model="on"
+             @change="localStorage.setItem('nvmon-show-dd', on ? '1' : '0'); document.body.classList.toggle('show-dd', on)">
+      <span>DD</span>
+    </label>
+    <label style="display:inline-flex; gap:4px; align-items:center; cursor:pointer;"
+           title="Show Mosaic card on nodes where Mosaic is disabled">
+      <input type="checkbox"
+             x-data="{ on: localStorage.getItem('nvmon-show-mosaic') === '1' }"
+             x-init="document.body.classList.toggle('show-mosaic', on)"
+             x-model="on"
+             @change="localStorage.setItem('nvmon-show-mosaic', on ? '1' : '0'); document.body.classList.toggle('show-mosaic', on)">
+      <span>Mosaic</span>
+    </label>
+    <label style="display:inline-flex; gap:4px; align-items:center; cursor:pointer;"
+           title="Show EDID card on nodes with no overrides or files">
+      <input type="checkbox"
+             x-data="{ on: localStorage.getItem('nvmon-show-edid') === '1' }"
+             x-init="document.body.classList.toggle('show-edid', on)"
+             x-model="on"
+             @change="localStorage.setItem('nvmon-show-edid', on ? '1' : '0'); document.body.classList.toggle('show-edid', on)">
+      <span>EDID</span>
+    </label>
+  </span>
+{% endblock %}
+
+{% block content %}
+  {# ---- Alert banner (top alert) ----------------------------- #}
+  <section aria-label="Alert banner"
+           x-data="{ top: $store.nvmon.topAlert }"
+           id="alert-banner">
+    {% if alerts and alerts|length > 0 and not alerts[0].dismissed %}
+      {% set a = alerts[0] %}
+      <div class="alert-banner {% if a.severity == 'CRITICAL' %}crit{% elif a.severity == 'WARNING' %}warn{% else %}ok{% endif %}"
+           role="alert" aria-live="assertive" data-alert-id="{{ a.id }}">
+        <span class="sev">{{ a.severity }}</span>
+        <span class="host">{{ a.hostname }}</span>
+        <span class="msg">{{ a.type }} — {{ a.message }}</span>
+        <span class="ts">{{ a.timestamp[11:19] }}</span>
+        <span class="actions">
+          <button class="btn btn-sm" type="button"
+                  x-data
+                  @click="$store.nvmon.gotoNode('{{ a.hostname }}')">Go to node</button>
+          <button class="btn btn-sm btn-ghost" type="button"
+                  hx-post="/alerts/{{ a.id }}/dismiss"
+                  hx-swap="outerHTML"
+                  hx-target="closest .alert-banner">Dismiss</button>
+        </span>
+      </div>
+    {% endif %}
+  </section>
+
+  {# ---- Group tabs + filter --------------------------------- #}
+  <div class="tabbar" role="tablist" aria-label="Node groups">
+    <div class="tabs">
+      <button class="tab" role="tab"
+              x-data
+              @click="$store.nvmon.setGroup('all')"
+              :aria-selected="$store.nvmon.group === 'all'"
+              data-group="all">
+        All <span class="count">{{ controller.nodes_online + controller.nodes_offline }}</span>
+      </button>
+      {% for g in groups %}
+        <button class="tab" role="tab"
+                x-data
+                @click="$store.nvmon.setGroup('{{ g.name }}')"
+                :aria-selected="$store.nvmon.group === '{{ g.name }}'"
+                data-group="{{ g.name }}">
+          {{ g.name }} <span class="count">{{ g.count }}</span>
+        </button>
+      {% endfor %}
+    </div>
+    <div class="spacer"></div>
+    <div class="view-toggle" role="group" aria-label="View toggle">
+      <button type="button"
+              x-data
+              title="Cards when they fit the window, the list when they don't"
+              @click="$store.nvmon.setView('auto')"
+              :aria-pressed="$store.nvmon.view === 'auto'">Auto</button>
+      <button type="button"
+              x-data
+              @click="$store.nvmon.setView('grid')"
+              :aria-pressed="$store.nvmon.view === 'grid'">Grid</button>
+      <button type="button"
+              x-data
+              @click="$store.nvmon.setView('list')"
+              :aria-pressed="$store.nvmon.view === 'list'">List</button>
+    </div>
+    <div class="filter">
+      <label for="node-filter" class="sr-only">Filter nodes</label>
+      <input id="node-filter" type="search" placeholder="Filter (/)"
+             x-data
+             @input="$store.nvmon.setFilter($event.target.value)">
+    </div>
+  </div>
+
+  {# ---- Node grid ------------------------------------------- #}
+  {# v0.8.2: per-node job badge — running (pulsing), failed (red) are
+     server-rendered; the "ok for two minutes" state and all live updates
+     come from the SSE node_update frame (nvmon.js renderJobBadge). #}
+  {% macro job_badge(n) -%}
+    {%- set job = n.job or {} -%}
+    {%- if n.job_active or job.in_progress -%}
+      <span class="node-job" data-field="job" data-state="running" title="{{ job.profile }}">&#x27F3; {{ job.action or 'working' }}{% if job.step %} &middot; {{ job.step }}{% endif %}</span>
+    {%- elif job.known and job.success is sameas false -%}
+      <span class="node-job" data-field="job" data-state="fail" title="{{ job.message }}">&#x2716; {{ job.action }} failed</span>
+    {%- else -%}
+      <span class="node-job" data-field="job" data-state="" style="display:none;"></span>
+    {%- endif -%}
+  {%- endmacro %}
+  {# #fleet wraps the card grid AND the list table so nvmon.js can
+     soft-refresh both with one htmx swap (after a fan-out finishes, and
+     every 45 s while nothing is open) instead of a full page reload. #}
+  <div id="fleet">
+  {# Fresh copy of the fix-hints list for the header dropdown; nvmon.js
+     moves it into #fix-hints-body after every soft refresh of #fleet. #}
+  <div id="fix-hints-src" hidden data-count="{{ hint_count }}">{{ fix_hints_list(nodes) }}</div>
+  <section id="nodes"
+           class="node-grid"
+           role="list"
+           aria-label="Render nodes"
+           x-data="nodeGrid()">
+    {% for n in nodes %}
+      {# Card border colour ('worst' level) — green by default, yellow only
+         when something the operator actively cares about is in WARN state,
+         red on CRIT or offline. We deliberately roll up ONLY the primary
+         signals: QSync subsystem, profile validation, alert count. DD and
+         Mosaic are optional/secondary — DD reports level=warn for
+         "inactive" on a totally healthy non-DD rig, so including them in
+         the rollup made every node yellow forever. The DD/Mosaic dots
+         (when revealed by the operator's Show DD/Mosaic toggle) still
+         carry their own level colour individually; they just don't poison
+         the parent card. #}
+      {% set worst = 'ok' %}
+      {% set qsync_lvl = (n.subsystems.qsync.level if n.subsystems and n.subsystems.qsync else 'off') %}
+      {% if qsync_lvl == 'crit' %}{% set worst = 'crit' %}{% endif %}
+      {% if worst != 'crit' and (n.alerts_count or 0) > 0 %}{% set worst = 'warn' %}{% endif %}
+      {% if worst != 'crit' and qsync_lvl == 'warn' %}{% set worst = 'warn' %}{% endif %}
+      {% if worst != 'crit' and n.validation and n.validation.checks and not n.validation.all_passed %}
+        {% set worst = 'warn' %}
+      {% endif %}
+      <article class="node"
+               role="listitem"
+               tabindex="0"
+               data-hostname="{{ n.hostname }}"
+               data-group="{{ n.group }}"
+               data-online="{{ 'true' if n.online else 'false' }}"
+               data-self="{{ 'true' if n.is_self else 'false' }}"
+               data-level="{{ worst }}"
+               aria-labelledby="host-{{ n.hostname }}"
+               hx-get="/node/{{ n.hostname }}/detail"
+               hx-target="#slideover-portal"
+               hx-swap="innerHTML"
+               @keydown.enter="$el.click()">
+        <div class="node-head">
+          <span id="host-{{ n.hostname }}" class="node-host">{{ n.hostname }}</span>
+          <span class="node-status {% if not n.online %}offline{% endif %}">
+            {{ 'ONLINE' if n.online else 'OFFLINE' }}
+          </span>
+          {{ job_badge(n) }}
+        </div>
+
+        {# Both online and offline content blocks ALWAYS render — CSS
+           gates visibility via the card's `data-online` attribute, which
+           SSE keeps in sync. Why: previously the online block only
+           rendered when n.online was true at server-render time, so when
+           a node came back from OFFLINE → ONLINE mid-session there were
+           no `[data-field=…]` targets in the DOM for the SSE handler to
+           write into. The slide-over (a fresh server fetch) had the new
+           data; the tile sat stale until full reload. Stamping the
+           refreshable fields with placeholder content unconditionally
+           lets the SSE node_update handler always find its targets. #}
+        <div class="node-online-block">
+          <div class="node-sub">
+            <span data-field="active_profile">{{ n.active_profile or 'no profile' }}</span>
+            {% if n.alerts_count and n.alerts_count > 0 %}
+              <span class="warn-tag" aria-label="{{ n.alerts_count }} alerts">[!]</span>
+            {% endif %}
+          </div>
+
+          <div class="node-dots" aria-label="Subsystem status">
+            <span class="dot" data-level="{{ n.subsystems.qsync.level }}"
+                  title="QSync: {{ n.subsystems.qsync.status }}">QS</span>
+            {# DD + Mosaic dots: per-subsystem header toggles control
+               whether idle dots appear; an active subsystem omits the
+               `optional` class and stays visible regardless. #}
+            <span class="dot {% if n.subsystems.dd.status != 'active' %}optional{% endif %}"
+                  data-subsystem="dd"
+                  data-level="{{ n.subsystems.dd.level }}"
+                  title="DirectDisplay: {{ n.subsystems.dd.status }}">DD</span>
+            <span class="dot {% if n.subsystems.mosaic.status == 'off' %}optional{% endif %}"
+                  data-subsystem="mosaic"
+                  data-level="{{ n.subsystems.mosaic.level }}"
+                  title="Mosaic: {{ n.subsystems.mosaic.status }}">MOS</span>
+          </div>
+
+          {# v0.8.2: daisy-chain line — "↑ upstream" on a healthy client,
+             the mismatch reason (warn) when the chain is wrong. #}
+          {% set chain = n.chain or {} %}
+          {% set chain_text = ('&uarr; ' ~ chain.upstream) if chain.upstream else '' %}
+          <div class="node-chain" data-field="chain" data-level="{{ chain.level or 'ok' }}"
+               {% if not (chain.upstream or chain.detail) %}style="display:none;"{% endif %}>{{ chain_text | safe }}{% if chain.detail %}{% if chain.upstream %} &middot; {% endif %}{{ chain.detail }}{% endif %}</div>
+
+          <div class="node-meta">
+            <span><span data-field="displays_count">{{ n.displays_count or 0 }}</span> displays</span>
+            <span>@<span data-field="refresh_hz">{{ '%.3f'|format(n.refresh_hz or 0) }}</span>Hz</span>
+            {# v0.9.3: live colour depth / encoding (Windows wire format). #}
+            <span data-field="color_text" title="Colour depth / pixel encoding on the wire"
+                  {% if not n.color_text %}style="display:none;"{% endif %}>{{ n.color_text }}</span>
+          </div>
+
+          {# Sparkline always rendered. Empty data-sparkline + 0°C span
+             until the SSE node_update fills them in. #}
+          {% set t = (n.gpu[0].temperature_c if (n.gpu and n.gpu|length > 0) else 0) %}
+          {% set tcls = 'crit' if t > 85 else ('warn' if t > 75 else 'ok') %}
+          <div class="node-spark" aria-label="GPU 0 temperature {{ t }} Celsius">
+            <svg class="sparkline" width="120" height="24"
+                 data-sparkline="{% if n.gpu and n.gpu|length > 0 %}{{ n.gpu[0].sparkline|join(',') }}{% endif %}"
+                 data-min="40" data-max="95"
+                 viewBox="0 0 120 24" aria-hidden="true">
+              <polyline fill="none" stroke="currentColor" stroke-width="1.5"
+                        points="" />
+            </svg>
+            <span class="temp {{ tcls }}" data-field="temperature_c">GPU {{ t }}&deg;C</span>
+          </div>
+        </div>
+
+        <div class="node-offline-block">
+          <div class="node-sub muted">unreachable</div>
+          <div class="node-meta muted"><span>last seen</span><span data-field="last_seen">{{ n.last_seen or '—' }}</span></div>
+        </div>
+
+        <div class="node-foot">
+          <span>{% if n.last_poll_ms_ago is not none %}{{ (n.last_poll_ms_ago / 1000)|round(1) }}s ago{% else %}—{% endif %}</span>
+          {# v0.8.0: paused/stale snapshot marker. Updated live by the SSE
+             node_update handler (data-field="status_age"). #}
+          <span class="mono" data-field="status_age" data-stale="{{ '1' if n.status_stale else '0' }}"
+                style="font-size:10px; {% if n.job_active %}color:#38bdf8;{% elif n.status_stale %}color:var(--warn);{% else %}display:none;{% endif %}"
+                title="Age of the agent's status snapshot">{% if n.job_active %}&#x27F3; applying{% elif n.status_stale %}stale {{ n.status_age_s|round(0)|int }}s{% endif %}</span>
+          {% if n.agent_version %}
+            <span class="muted mono" title="Listener version" style="font-size:10px;">v{{ n.agent_version }}</span>
+          {% endif %}
+
+          {# Per-node power icon. Same ⏻ glyph as the header so the
+             affordance is recognizable; @click.stop so the click does
+             NOT also open the slide-over (whose target is the whole
+             card). Two-step confirm chain in $store.nvmon.openPower.
+             Hidden when n.is_self because we refuse to power-cycle the
+             monitor box from its own dashboard. #}
+          {% if not n.is_self %}
+            <div class="node-power" x-data="{ open: false }"
+                 @click.outside="open = false"
+                 style="position:relative; display:inline-block; margin-right:4px;">
+              <button class="menu" type="button"
+                      @click.stop="open = !open"
+                      :aria-expanded="open"
+                      aria-haspopup="menu"
+                      aria-label="Power (restart/shutdown {{ n.hostname }})"
+                      title="Power…"
+                      style="color:var(--crit);">⏻</button>
+              <div x-show="open" x-cloak x-transition.opacity
+                   role="menu"
+                   @click.stop
+                   style="position:absolute; right:0; bottom:calc(100% + 4px); z-index:50;
+                          background:var(--surface); border:1px solid var(--border);
+                          border-radius:var(--radius); box-shadow:0 4px 16px rgba(0,0,0,0.5);
+                          min-width:200px; padding:4px 0; text-align:left;">
+                <button type="button" role="menuitem" class="rem-gated"
+                        @click.stop="open = false; $store.nvmon.openPower('restart_listener', {scope: ['{{ n.hostname }}']})"
+                        style="display:block; width:100%; text-align:left; padding:8px 14px;
+                               background:none; border:none; color:var(--text);
+                               font-family:inherit; font-size:13px; cursor:pointer;"
+                        onmouseover="this.style.background='var(--surface-lo)'"
+                        onmouseout="this.style.background='none'"
+                        title="Bounce the listener process — picks up freshly-mirrored code without rebooting Windows">
+                  Restart listener (no OS reboot)
+                </button>
+                <button type="button" role="menuitem"
+                        @click.stop="open = false; $store.nvmon.openPower('restart', {scope: ['{{ n.hostname }}']})"
+                        style="display:block; width:100%; text-align:left; padding:8px 14px;
+                               background:none; border:none; color:var(--crit);
+                               font-family:inherit; font-size:13px; cursor:pointer;"
+                        onmouseover="this.style.background='var(--surface-lo)'"
+                        onmouseout="this.style.background='none'">
+                  Restart this machine…
+                </button>
+                <button type="button" role="menuitem"
+                        @click.stop="open = false; $store.nvmon.openPower('shutdown', {scope: ['{{ n.hostname }}']})"
+                        style="display:block; width:100%; text-align:left; padding:8px 14px;
+                               background:none; border:none; color:var(--crit);
+                               font-family:inherit; font-size:13px; cursor:pointer;"
+                        onmouseover="this.style.background='var(--surface-lo)'"
+                        onmouseout="this.style.background='none'">
+                  Shutdown this machine…
+                </button>
+              </div>
+            </div>
+          {% else %}
+            {# Visual marker on the controller's own card so the operator
+               can tell at a glance which one they're looking at. The
+               muted 'monitor' tag replaces the power icon's slot. #}
+            <span class="muted mono" style="font-size:10px; margin-right:4px;"
+                  title="This is the monitor (controller) machine — power actions are intentionally disabled here.">monitor</span>
+          {% endif %}
+
+          <button class="menu" type="button"
+                  aria-label="Node actions"
+                  @click.stop="$store.nvmon.openNodeMenu('{{ n.hostname }}', $event)">⋮</button>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+
+  {# ---- List view (sortable table) ---------------------------------
+       Shown only when body.view-list is set (header toggle). Each row
+       is clickable (opens the slide-over) and column headers are
+       sortable — click to sort asc, click again for desc. Cells carry
+       data-sort attributes that the JS reads (numeric where it makes
+       sense, lowercased text otherwise) so we sort the *real* value
+       and not the displayed string. #}
+  <table id="node-list" class="node-list" aria-label="Render nodes (list view)">
+    <thead>
+      <tr>
+        <th data-col="hostname" data-sort-type="text">Hostname</th>
+        <th data-col="status"   data-sort-type="text">Status</th>
+        <th data-col="profile"  data-sort-type="text">Profile</th>
+        <th data-col="qsync"    data-sort-type="level">QSync</th>
+        <th data-col="role"     data-sort-type="text">Role</th>
+        <th data-col="refresh"  data-sort-type="num" class="num">Refresh</th>
+        <th data-col="color"    data-sort-type="text" title="Colour depth / pixel encoding on the wire">Depth</th>
+        <th data-col="displays" data-sort-type="num" class="num">Disp</th>
+        <th data-col="gpu_temp" data-sort-type="num" class="num">GPU °C</th>
+        <th data-col="alerts"   data-sort-type="num" class="num">Alerts</th>
+        <th data-col="last_poll" data-sort-type="num" class="num">Last poll</th>
+        <th data-col="driver"    data-sort-type="text">Driver</th>
+        <th data-col="version"   data-sort-type="text">nvmon</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for n in nodes %}
+        {% set t = (n.gpu[0].temperature_c if (n.gpu and n.gpu|length > 0) else 0) %}
+        {% set tcls = 'crit' if t > 85 else ('warn' if t > 75 else ('ok' if t > 0 else 'muted')) %}
+        {% set qlevel = (n.subsystems.qsync.level if n.subsystems and n.subsystems.qsync else 'off') %}
+        {# Sort weight for level columns: crit > warn > ok > off — sort
+           descending puts the worst at the top, which is what an
+           operator triaging issues wants. #}
+        {% set qweight = {'crit': 3, 'warn': 2, 'ok': 1, 'off': 0}.get(qlevel, 0) %}
+        {% set last_poll = n.last_poll_ms_ago if n.last_poll_ms_ago is not none else 999999999 %}
+        <tr class="node-row"
+            data-hostname="{{ n.hostname }}"
+            data-group="{{ n.group }}"
+            data-online="{{ 'true' if n.online else 'false' }}"
+            data-self="{{ 'true' if n.is_self else 'false' }}"
+            tabindex="0"
+            hx-get="/node/{{ n.hostname }}/detail"
+            hx-target="#slideover-portal"
+            hx-swap="innerHTML"
+            @keydown.enter="$el.click()">
+          <td data-sort="{{ n.hostname|lower }}">{{ n.hostname }}</td>
+          <td data-field="status" data-sort="{{ '0_online' if n.online else '1_offline' }}"
+              class="{{ 'ok' if n.online else 'crit' }}">
+            <span data-field="status_text">{{ 'ONLINE' if n.online else 'OFFLINE' }}</span> {{ job_badge(n) }}
+          </td>
+          <td data-field="profile" data-sort="{{ (n.active_profile or '~zzz')|lower }}">
+            {{ n.active_profile or '—' }}
+          </td>
+          <td data-field="qsync" data-sort="{{ qweight }}" data-level="{{ qlevel }}" class="qs-cell"
+              title="QSync: {{ n.subsystems.qsync.status if n.subsystems and n.subsystems.qsync else '' }}">
+            {{ qlevel | upper }}
+          </td>
+          <td data-field="role" data-sort="{{ (n.qsync_role or '~') | lower }}" class="muted">
+            {% if n.qsync_role %}{{ n.qsync_role | upper }}{% else %}—{% endif %}
+          </td>
+          <td data-field="refresh" data-sort="{{ n.refresh_hz or 0 }}" class="num">
+            {% if n.refresh_hz %}{{ '%.3f'|format(n.refresh_hz) }} Hz{% else %}—{% endif %}
+          </td>
+          <td data-field="color" data-sort="{{ (n.color_text or '~')|lower }}" class="mono"
+              title="Colour depth / pixel encoding on the wire">
+            {% if n.color_text %}{{ n.color_text }}{% else %}—{% endif %}
+          </td>
+          <td data-field="displays" data-sort="{{ n.displays_count or 0 }}" class="num">{{ n.displays_count or 0 }}</td>
+          <td data-sort="{{ t }}" class="num {{ tcls }}">
+            {% if t %}{{ t }}{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ n.alerts_count or 0 }}" class="num">
+            {% if n.alerts_count %}<span class="warn-tag">{{ n.alerts_count }}</span>{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ last_poll }}" class="num">
+            {% if n.last_poll_ms_ago is not none %}{{ (n.last_poll_ms_ago / 1000)|round(1) }}s{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ (n.nvidia_driver_version or '~') | lower }}" class="muted">
+            {% if n.nvidia_driver_version %}{{ n.nvidia_driver_version }}{% else %}—{% endif %}
+          </td>
+          <td data-sort="{{ (n.agent_version or '~')|lower }}" class="muted">
+            {% if n.agent_version %}v{{ n.agent_version }}{% else %}—{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>{# /#fleet #}
+{% endblock %}
+
+{% block portals %}
+  {# HTMX target for slide-over detail panel #}
+  <div id="slideover-portal" aria-live="polite"></div>
+
+  {# HTMX target for fan-out modal #}
+  <div id="modal-portal" aria-live="polite"></div>
+
+  {# Embed profiles for the fan-out picker (static JSON island) #}
+  <script id="profiles-data" type="application/json">{{ profiles_union | tojson }}</script>
+  <script id="groups-data"   type="application/json">{{ groups | tojson }}</script>
+{% endblock %}

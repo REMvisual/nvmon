@@ -1,0 +1,819 @@
+/* ============================================================
+   nvmon unified dashboard styles
+   Mobile-first, dark theme, NVIDIA-green accents.
+   Evolves nvdd's visual language (see nvdd/httpserver.py).
+   ============================================================ */
+
+/* ---- Design tokens (extends nvdd) ------------------------- */
+:root {
+  /* Surfaces & borders (elevation scale) */
+  --bg:         #0a0a0a;   /* page */
+  --surface:    #151515;   /* cards */
+  --surface-hi: #1d1d1d;   /* modal / slide-over */
+  --surface-lo: #0f0f0f;   /* subtle recess */
+  --border:     #2a2a2a;
+  --border-hi:  #3a3a3a;
+
+  /* Text */
+  --text:       #e0e0e0;
+  --text-muted: #888;
+  --text-dim:   #555;
+
+  /* Brand + severity */
+  --brand:      #76b900;   /* NVIDIA green */
+  --brand-soft: #1a3a00;
+  --brand-dim:  #0f2400;
+  --ok:         #76b900;
+  --ok-soft:    #0f2400;
+  --template:      #2dd4bf;   /* teal-green: Template button, distinct from Re-apply */
+  --template-soft: #0b2a26;
+  --warn:       #ffaa00;
+  --warn-soft:  #2a2000;
+  --crit:       #ff4444;
+  --crit-soft:  #2a0a0a;
+  --offline:    #555;
+
+  /* Focus & shadow */
+  --focus:      #76b900;
+  --shadow-1:   0 2px  8px rgba(0,0,0,0.4);
+  --shadow-2:   0 4px 18px rgba(0,0,0,0.55);
+  --shadow-3:   0 8px 32px rgba(0,0,0,0.7);
+
+  /* Motion */
+  --t-fast:     120ms;
+  --t-med:      220ms;
+  --t-slow:     360ms;
+  --ease:       cubic-bezier(.2,.8,.2,1);
+
+  /* Layout */
+  --radius-sm:  4px;
+  --radius:     6px;
+  --radius-lg:  10px;
+  --pad-sm:     8px;
+  --pad:        12px;
+  --pad-lg:     20px;
+
+  /* Typography — system only, no external fonts */
+  --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --mono: Consolas, 'Courier New', monospace;
+}
+
+/* ---- Reset ------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; cursor: pointer; }
+input  { font: inherit; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Focus ring (AAA-visible) ------------------------------ */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Skip link --------------------------------------------- */
+.skip-link {
+  position: absolute; top: -40px; left: 8px; z-index: 999;
+  background: var(--brand); color: #000; padding: 6px 12px;
+  border-radius: var(--radius-sm); font-weight: 600;
+}
+.skip-link:focus { top: 8px; }
+
+/* ---- Header ------------------------------------------------ */
+.hdr {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--pad);
+  padding: var(--pad) var(--pad-lg);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+}
+.hdr-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 18px; font-weight: 600; color: var(--brand);
+  letter-spacing: 0.3px;
+}
+/* Legacy glow-dot indicator — replaced by the SVG glyph in layout.html.
+   Kept selector + display:none to preserve any external references. */
+.hdr-brand::before { display: none; }
+.hdr-brand-glyph { display: block; }
+.hdr-brand-title {
+  display: inline-flex; flex-direction: column; line-height: 1;
+}
+.hdr-brand-name {
+  font-size: 18px; font-weight: 600; color: var(--brand);
+}
+.hdr-brand-sub {
+  font-size: 9px; font-weight: 400; color: var(--text-muted);
+  letter-spacing: 0.8px; text-transform: uppercase;
+  margin-top: 3px;
+  background: none; border: none; padding: 0;
+  font-family: inherit; cursor: pointer;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.hdr-brand-sub:hover { color: var(--text); }
+.hdr-brand-sub:focus-visible { outline: 1px dashed var(--brand); outline-offset: 2px; }
+
+/* REM toggle ON: subtitle glows green; gated rows become visible. */
+html[data-rem="on"] .hdr-brand-sub {
+  color: var(--ok);
+  text-shadow: 0 0 6px var(--ok);
+}
+
+/* Gate advanced controls behind the REM toggle. Default = hidden.
+   Both gated targets (the diagnose <section> and the in-menu <button>s)
+   want `display:block` when visible, so we hardcode that on the "on"
+   side rather than `revert` (which would roll back to the UA default —
+   inline-block for buttons — and break the menu layout). */
+.rem-gated { display: none !important; }
+html[data-rem="on"] .rem-gated { display: block !important; }
+/* The Show-DD/Mosaic <label> is also gated, but it's a flex container
+   (checkbox + text) — block would break its inline layout in .hdr-actions. */
+html[data-rem="on"] label.ctx.rem-gated { display: inline-flex !important; }
+.hdr-counters {
+  display: flex; gap: var(--pad); color: var(--text-muted);
+  font-family: var(--mono); font-size: 13px;
+}
+.hdr-counters .cnt { color: var(--text); }
+.hdr-counters .cnt.ok   { color: var(--ok); }
+.hdr-counters .cnt.warn { color: var(--warn); }
+.hdr-counters .cnt.crit { color: var(--crit); }
+
+.hdr-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.hdr-actions .ctx { color: var(--text-muted); font-size: 12px; align-self: center; }
+
+/* ---- Buttons ----------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  background: var(--surface-hi); color: var(--text);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius);
+  font-size: 13px; font-weight: 500;
+  transition: background var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
+}
+.btn:hover  { background: #262626; border-color: #4a4a4a; }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary { border-color: var(--brand); color: var(--brand); }
+.btn-primary:hover { background: var(--brand-soft); }
+.btn-danger  { border-color: var(--crit); color: var(--crit); }
+.btn-danger:hover { background: var(--crit-soft); }
+.btn-template { border-color: var(--template); color: var(--template); }
+.btn-template:hover { background: var(--template-soft); }
+/* rem-gated header buttons must come back as inline-flex, not block */
+html[data-rem="on"] .btn.rem-gated { display: inline-flex !important; }
+.btn-ghost   { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--surface-hi); }
+.btn-sm { padding: 3px 10px; font-size: 12px; }
+.btn-icon {
+  width: 32px; height: 32px; padding: 0; justify-content: center;
+  font-size: 15px;
+}
+
+/* ---- Alert banner ------------------------------------------ */
+.alert-banner {
+  display: flex; align-items: center; gap: var(--pad);
+  padding: 10px var(--pad-lg);
+  border-left: 4px solid var(--warn);
+  background: var(--warn-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+.alert-banner.crit { border-left-color: var(--crit); background: var(--crit-soft); }
+.alert-banner.ok   { border-left-color: var(--ok);   background: var(--ok-soft); }
+.alert-banner .sev {
+  font-weight: 700; font-size: 11px; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  background: rgba(0,0,0,0.25); color: var(--warn);
+}
+.alert-banner.crit .sev { color: var(--crit); }
+.alert-banner .host  { font-family: var(--mono); color: var(--text); font-weight: 600; }
+.alert-banner .msg   { color: var(--text-muted); flex: 1; }
+.alert-banner .ts    { color: var(--text-dim); font-family: var(--mono); font-size: 12px; }
+.alert-banner .actions { display: flex; gap: 6px; }
+
+/* ---- Group tabs + filter row ------------------------------- */
+.tabbar {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  padding: var(--pad-sm) var(--pad-lg);
+  background: var(--surface-lo);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.tabbar .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: thin; }
+.tab {
+  padding: 6px 14px;
+  background: transparent; border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px; font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+}
+.tab:hover       { color: var(--text); }
+.tab[aria-selected="true"] {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.tab .count {
+  display: inline-block; margin-left: 6px;
+  color: var(--text-dim); font-family: var(--mono); font-size: 11px;
+}
+.tabbar .spacer { flex: 1; }
+.tabbar .filter {
+  display: flex; gap: 6px; align-items: center;
+}
+.tabbar .filter input {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-hi); border-radius: var(--radius);
+  padding: 5px 10px; font-size: 13px; width: 180px;
+}
+.view-toggle {
+  display: flex; border: 1px solid var(--border-hi); border-radius: var(--radius);
+  overflow: hidden;
+}
+.view-toggle button {
+  background: transparent; color: var(--text-muted); border: 0;
+  padding: 4px 10px; font-size: 12px;
+}
+.view-toggle button[aria-pressed="true"] {
+  background: var(--surface-hi); color: var(--brand);
+}
+
+/* ---- Main grid --------------------------------------------- */
+main {
+  padding: var(--pad-lg);
+  max-width: 1800px;
+  margin: 0 auto;
+}
+.node-grid {
+  display: grid;
+  grid-template-columns: 1fr;               /* mobile: 1-col */
+  gap: var(--pad);
+}
+
+/* ---- Node card --------------------------------------------- */
+.node {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--pad);
+  display: flex; flex-direction: column; gap: 8px;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease),
+              transform var(--t-fast) var(--ease);
+  position: relative;
+}
+.node:hover { background: var(--surface-hi); border-color: var(--border-hi); }
+.node:focus-visible { transform: translateY(-1px); }
+.node[data-level="warn"] { border-left: 3px solid var(--warn); }
+.node[data-level="crit"] { border-left: 3px solid var(--crit); background: linear-gradient(90deg, var(--crit-soft) 0%, var(--surface) 40%); }
+.node[data-online="false"] { opacity: 0.55; border-color: var(--border); }
+.node[data-online="false"] .node-status { color: var(--offline); }
+
+/* Online/offline content blocks both render server-side; CSS picks
+   which one is visible based on data-online, kept in sync by SSE.
+   Lets the SSE handler always have its data-field targets in the
+   DOM, even when a node was offline at first paint and came back
+   later. */
+.node[data-online="true"]  .node-offline-block { display: none; }
+.node[data-online="false"] .node-online-block  { display: none; }
+
+.node-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.node-host { font-size: 15px; font-weight: 600; color: var(--text); font-family: var(--mono); }
+.node-status {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  color: var(--ok);
+}
+.node-status.offline { color: var(--offline); }
+
+/* v0.8.2: per-node job badge (apply / sync / restore outcome) next to the
+   ONLINE pill. Filled server-side and kept live by the SSE node_update
+   frame: running = pulsing blue, ok = green for two minutes after the job
+   finished, fail = red until the next job. */
+.node-job {
+  font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+  padding: 1px 6px; border-radius: 3px; margin-left: 6px; white-space: nowrap;
+  border: 1px solid transparent; vertical-align: middle;
+}
+.node-job[data-state="running"] { color: #38bdf8; border-color: #38bdf8; animation: nvmon-pulse 1.2s ease-in-out infinite; }
+.node-job[data-state="ok"]      { color: var(--ok);   border-color: var(--ok); }
+.node-job[data-state="fail"]    { color: var(--crit); border-color: var(--crit); }
+@keyframes nvmon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* v0.8.2: daisy-chain line on a client card — "↑ NODE-01" when the chain
+   is right, the mismatch reason in warn colour when it is not. */
+.node-chain { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.node-chain[data-level="warn"] { color: var(--warn); }
+.node-list .node-job { margin-left: 6px; }
+
+.node-sub   { font-size: 12px; color: var(--text-muted); font-family: var(--mono); }
+.node-sub .warn-tag { color: var(--warn); margin-left: 4px; }
+
+.node-dots { display: flex; gap: 12px; font-family: var(--mono); font-size: 12px; }
+.node-dots .dot { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); }
+.node-dots .dot::before {
+  content: "●"; font-size: 14px; line-height: 1;
+}
+.node-dots .dot[data-level="ok"]::before   { color: var(--ok); }
+.node-dots .dot[data-level="warn"]::before { color: var(--warn); }
+.node-dots .dot[data-level="crit"]::before { color: var(--crit); }
+.node-dots .dot[data-level="off"]::before  { color: var(--offline); content: "○"; }
+
+.node-meta {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--text-muted); font-family: var(--mono);
+}
+
+.node-spark {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 4px;
+}
+.node-spark svg { display: block; }
+.node-spark .temp { font-family: var(--mono); font-size: 12px; }
+.node-spark .temp.ok   { color: var(--ok); }
+.node-spark .temp.warn { color: var(--warn); }
+.node-spark .temp.crit { color: var(--crit); }
+
+.node-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; color: var(--text-dim); font-family: var(--mono);
+  border-top: 1px dashed var(--border); padding-top: 6px;
+}
+.node-foot .menu {
+  background: transparent; border: 0; color: var(--text-muted); cursor: pointer;
+  padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.node-foot .menu:hover { background: var(--surface-hi); color: var(--text); }
+
+/* ---- Footer ----------------------------------------------- */
+.ftr {
+  padding: var(--pad) var(--pad-lg);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim); font-size: 11px; font-family: var(--mono);
+  display: flex; justify-content: space-between; gap: var(--pad); flex-wrap: wrap;
+}
+.ftr .stream-state { display: inline-flex; align-items: center; gap: 6px; }
+.ftr .stream-state::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+  animation: pulse 2s infinite;
+}
+.ftr .stream-state[data-state="reconnecting"]::before { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.ftr .stream-state[data-state="offline"]::before       { background: var(--crit); box-shadow: none; animation: none; }
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0.35; }
+}
+
+/* ---- Slide-over (node detail) ----------------------------- */
+.slideover-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+  animation: fade-in var(--t-med) var(--ease);
+}
+.slideover {
+  position: fixed; top: 0; right: 0; height: 100vh;
+  width: 100%;                 /* mobile: full-screen */
+  background: var(--surface-hi);
+  border-left: 1px solid var(--border-hi);
+  box-shadow: var(--shadow-3);
+  z-index: 101;
+  overflow-y: auto;
+  animation: slide-in var(--t-med) var(--ease);
+  display: flex; flex-direction: column;
+}
+.slideover-head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-hi);
+  border-bottom: 1px solid var(--border);
+  padding: var(--pad) var(--pad-lg);
+  display: flex; align-items: center; gap: var(--pad); flex-wrap: wrap;
+}
+.slideover-head h2 {
+  font-family: var(--mono); font-size: 18px; color: var(--text);
+}
+.slideover-head .ip { color: var(--text-muted); font-family: var(--mono); font-size: 13px; }
+.slideover-head .spacer { flex: 1; }
+
+.slideover-body { padding: var(--pad-lg); }
+.slideover-section { margin-bottom: var(--pad-lg); }
+.slideover-section h3 {
+  color: var(--text-muted); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  font-weight: 600; margin-bottom: var(--pad);
+}
+
+.subsystem-grid {
+  display: grid; gap: var(--pad);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.subsystem {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: var(--pad);
+}
+.subsystem .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.subsystem .title { color: var(--brand); font-weight: 600; font-size: 13px; }
+.subsystem .badge {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+}
+.subsystem .badge.ok   { background: var(--ok-soft);  color: var(--ok); }
+.subsystem .badge.warn { background: var(--warn-soft);color: var(--warn); }
+.subsystem .badge.crit { background: var(--crit-soft);color: var(--crit); }
+.subsystem .kv { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+.subsystem .kv .k { color: var(--text-muted); }
+.subsystem .kv .v { color: var(--text); font-family: var(--mono); }
+
+.chart-grid {
+  display: grid; gap: var(--pad);
+  grid-template-columns: 1fr;
+}
+/* Each chart cell is a flex column with a hard 160px height. Chart.js
+   with maintainAspectRatio:false expects the parent to enforce a height
+   — without one, the canvas grows on every resize tick. The label row
+   sits at its natural height and the canvas wrapper fills the remainder
+   via flex:1 so the canvas can size to it via 100%/100%. */
+.chart-grid > div {
+  display: flex;
+  flex-direction: column;
+  height: 160px;
+}
+.chart-grid > div > .chart-canvas-wrap {
+  flex: 1 1 auto;
+  min-height: 0;            /* allow shrink-to-fit inside flex column */
+  position: relative;       /* canvas resize anchor */
+}
+.chart-grid > div > .chart-canvas-wrap > canvas[data-chart] {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* table (displays, etc) */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th {
+  text-align: left; padding: 8px; color: var(--text-muted);
+  border-bottom: 1px solid var(--border); font-weight: 500;
+  font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;
+}
+.tbl td { padding: 7px 8px; border-bottom: 1px solid var(--surface-lo); font-family: var(--mono); }
+.tbl tr:hover td { background: var(--surface); }
+
+/* ---- Modal (fan-out) -------------------------------------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  z-index: 200; display: grid; place-items: center;
+  animation: fade-in var(--t-med) var(--ease);
+  padding: var(--pad);
+}
+.modal {
+  background: var(--surface-hi);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  max-width: 560px; width: 100%;
+  max-height: 90vh; overflow-y: auto;
+  animation: pop-in var(--t-med) var(--ease);
+}
+.modal-head {
+  padding: var(--pad-lg);
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { font-size: 16px; color: var(--brand); }
+.modal-body { padding: var(--pad-lg); }
+.modal-foot {
+  padding: var(--pad) var(--pad-lg);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: var(--pad-sm);
+}
+.profile-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 280px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 4px;
+}
+.profile-list label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.profile-list label:hover { background: var(--surface); }
+.profile-list input[type="radio"] { accent-color: var(--brand); }
+
+.target-list { margin-top: var(--pad); font-size: 12px; font-family: var(--mono); color: var(--text-muted); }
+.target-list .ok   { color: var(--ok); }
+.target-list .skip { color: var(--offline); }
+
+.progress-list { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 12px; }
+.progress-list .row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+}
+.progress-list .row .host { flex: 1; color: var(--text); }
+.progress-list .row.pending { color: var(--text-muted); }
+.progress-list .row.pending::before  { content: "…"; color: var(--text-muted); }
+.progress-list .row.running { color: var(--text); background: var(--surface); }
+.progress-list .row.running::before  { content: "◐"; color: var(--brand); animation: spin 1.4s linear infinite; display: inline-block; }
+.progress-list .row.done    { color: var(--ok); }
+.progress-list .row.done::before     { content: "✓"; color: var(--ok); font-weight: 700; }
+.progress-list .row.failed  { color: var(--crit); }
+.progress-list .row.failed::before   { content: "✗"; color: var(--crit); font-weight: 700; }
+.progress-list .row.skipped { color: var(--offline); }
+.progress-list .row.skipped::before  { content: "—"; color: var(--offline); }
+.progress-list .row .dur   { color: var(--text-dim); font-size: 11px; }
+
+/* ---- Login page ------------------------------------------- */
+.login-page {
+  min-height: 100vh;
+  display: grid; place-items: center;
+  padding: var(--pad-lg);
+}
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 360px; width: 100%;
+  box-shadow: var(--shadow-2);
+}
+.login-card h1 { color: var(--brand); font-size: 20px; margin-bottom: 6px; }
+.login-card .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
+.login-card label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.login-card input[type="password"] {
+  width: 100%; padding: 10px;
+  background: var(--surface-lo); color: var(--text);
+  border: 1px solid var(--border-hi); border-radius: var(--radius);
+  font-family: var(--mono);
+}
+.login-card .err { color: var(--crit); font-size: 12px; margin-top: 6px; min-height: 14px; }
+.login-card .btn { width: 100%; margin-top: var(--pad); justify-content: center; }
+
+/* ---- Animations ------------------------------------------- */
+@keyframes fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-in  { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes pop-in    { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes spin      { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+/* ---- Responsive breakpoints ------------------------------- */
+
+/* Tablet: 640–1023px — 2-col grid */
+@media (min-width: 640px) {
+  .node-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: repeat(2, 1fr); }
+  .slideover  { width: 85%; max-width: 900px; }
+}
+
+/* Laptop: 1024–1439px — 3-col grid */
+@media (min-width: 1024px) {
+  .node-grid { grid-template-columns: repeat(3, 1fr); }
+  .slideover { width: 70%; max-width: 1000px; }
+}
+
+/* Desktop: ≥1440px — 4-col grid */
+@media (min-width: 1440px) {
+  .node-grid { grid-template-columns: repeat(4, 1fr); }
+  .slideover { width: 60%; max-width: 1100px; }
+}
+
+/* ---- Reduced motion --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .slideover        { animation: fade-in var(--t-fast) var(--ease); }
+  .progress-list .row.running::before { animation: none; }
+  .ftr .stream-state::before { animation: none; }
+}
+
+/* ---- Utility ---------------------------------------------- */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.hidden { display: none !important; }
+[x-cloak] { display: none !important; }
+.mono  { font-family: var(--mono); }
+.muted { color: var(--text-muted); }
+.dim   { color: var(--text-dim); }
+.ok    { color: var(--ok); }
+.warn  { color: var(--warn); }
+.crit  { color: var(--crit); }
+
+/* ---- Toast (corner notification) ---------------------------
+   Used by fireFanoutDirect() to show fan-out results without
+   relying on the Alpine modal stack. Top-right, stacks naturally
+   via flow. Click to dismiss; auto-disappears after 8s. */
+.nvmon-toast {
+  position: fixed; right: 16px; top: 64px;
+  background: var(--surface-hi); color: var(--text);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap;
+  max-width: 420px;
+  box-shadow: var(--shadow-2);
+  z-index: 1000;
+  cursor: pointer;
+  animation: fade-in var(--t-med) var(--ease);
+}
+.nvmon-toast.ok      { border-left-color: var(--ok); }
+.nvmon-toast.warn    { border-left-color: var(--warn); }
+.nvmon-toast.crit    { border-left-color: var(--crit); }
+.nvmon-toast.pending { border-left-color: var(--text-muted); opacity: 0.85; }
+.nvmon-toast + .nvmon-toast { margin-top: 8px; top: auto; }
+
+/* ---- Fix hints dropdown (header, v0.9.10) ------------------
+   Header button; the list drops down under it. Amber with a count when
+   a node matches a known stuck state. */
+.fix-hints-menu { position: relative; display: inline-block; }
+.fix-hints-btn { color: var(--text-muted); }
+.fix-hints-btn.has { color: var(--warn); border-color: var(--warn); font-weight: 600; }
+.fix-hints-panel {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 50;
+  width: 440px; max-height: 70vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5); padding: 12px; text-align: left;
+}
+.fix-hints-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; font-size: 12px; }
+.fix-hints-empty { font-size: 12px; }
+.fix-hint { border-left: 3px solid var(--warn); padding: 8px 10px; margin-bottom: 8px;
+            background: var(--surface); border-radius: var(--radius); font-size: 12px; line-height: 1.45; }
+.fix-hint[data-action="reapply"] { border-left-color: var(--text-muted); }
+.fix-hint-top { display: flex; gap: 8px; align-items: baseline; margin-bottom: 2px; }
+.fix-hint-action { font-family: var(--mono); font-weight: 700; color: var(--warn); font-size: 11px; }
+.fix-hint-node { font-family: var(--mono); color: var(--text-muted); font-size: 11px; }
+.fix-hint-title { font-weight: 600; margin-bottom: 2px; }
+.fix-hint-detail { color: var(--text); }
+.fix-hint-evidence { color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+
+/* ---- Profile picker overlay -------------------------------
+   Replaces window.prompt() for choosing which profile to apply.
+   Centered card with a scrollable list of profile buttons.
+   Built imperatively in nvmon.js::showProfilePicker(). */
+.nvmon-picker-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1100;
+  animation: fade-in var(--t-med) var(--ease);
+}
+.nvmon-picker-card {
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  min-width: 320px; max-width: 520px;
+  max-height: 70vh;
+  display: flex; flex-direction: column;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+.nvmon-picker-title {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 13px;
+}
+.nvmon-picker-list {
+  display: flex; flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.nvmon-picker-item {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 9px 14px;
+  text-align: left;
+  font-family: var(--mono); font-size: 13px;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.nvmon-picker-item:hover,
+.nvmon-picker-item:focus {
+  background: var(--surface-lo);
+  outline: 1px solid var(--brand);
+  outline-offset: -1px;
+}
+.nvmon-picker-item.preferred {
+  border-left: 3px solid var(--brand);
+}
+.nvmon-picker-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end;
+}
+.nvmon-picker-cancel {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.nvmon-picker-cancel:hover { color: var(--text); }
+
+/* ---- Optional (DD / Mosaic / EDID) cards ------------------
+   Hidden by default. Three header toggles add `show-dd`,
+   `show-mosaic`, `show-edid` to <body>; each selector reveals
+   only its own cards. The `optional` class is stamped server-side
+   ONLY when the subsystem is idle on that node — an active DD or
+   Mosaic, or an EDID with overrides/files, omits the class and is
+   always visible regardless of the toggle. */
+.optional { display: none !important; }
+
+body.show-dd .optional[data-subsystem="dd"] { display: inherit !important; }
+body.show-dd .subsystem.optional[data-subsystem="dd"] { display: block !important; }
+body.show-dd .node-dots .dot.optional[data-subsystem="dd"] { display: inline-flex !important; }
+
+body.show-mosaic .optional[data-subsystem="mosaic"] { display: inherit !important; }
+body.show-mosaic .subsystem.optional[data-subsystem="mosaic"] { display: block !important; }
+body.show-mosaic .node-dots .dot.optional[data-subsystem="mosaic"] { display: inline-flex !important; }
+
+body.show-edid .optional[data-subsystem="edid"] { display: inherit !important; }
+body.show-edid .subsystem.optional[data-subsystem="edid"] { display: block !important; }
+
+/* ---- List view: a real sortable table -----------------------
+   The header toggle stores 'list' or 'grid' in localStorage and
+   adds the matching body class. The dashboard renders BOTH a
+   card grid and a <table id="node-list">; we toggle visibility
+   here so each view stays naturally semantic. */
+.node-list { display: none; }                   /* hidden by default */
+body.view-list .node-grid { display: none; }    /* in list mode, hide cards */
+body.view-list .node-list {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 0 var(--pad) var(--pad) var(--pad);
+}
+body.view-list .node-list thead th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+body.view-list .node-list thead th:hover { color: var(--text); }
+body.view-list .node-list thead th.num   { text-align: right; }
+body.view-list .node-list thead th[data-sort-dir="asc"]::after  { content: " ▲"; opacity: 0.7; }
+body.view-list .node-list thead th[data-sort-dir="desc"]::after { content: " ▼"; opacity: 0.7; }
+
+body.view-list .node-list tbody tr {
+  cursor: pointer;
+  border-bottom: 1px solid var(--surface-lo);
+}
+body.view-list .node-list tbody tr:hover    { background: var(--surface); }
+body.view-list .node-list tbody tr:focus    { outline: 1px solid var(--brand); outline-offset: -1px; }
+body.view-list .node-list tbody tr[data-online="false"] { color: var(--text-muted); }
+body.view-list .node-list tbody td {
+  padding: 7px 10px;
+  font-family: var(--mono);
+  vertical-align: middle;
+}
+body.view-list .node-list tbody td.num   { text-align: right; font-variant-numeric: tabular-nums; }
+body.view-list .node-list tbody td.ok    { color: var(--ok); }
+body.view-list .node-list tbody td.warn  { color: var(--warn); }
+body.view-list .node-list tbody td.crit  { color: var(--crit); }
+body.view-list .node-list tbody td.muted { color: var(--text-muted); }
+/* QSync level pill — colored by data-level attribute */
+body.view-list .node-list tbody td.qs-cell { font-weight: 600; }
+body.view-list .node-list tbody td.qs-cell[data-level="ok"]   { color: var(--ok); }
+body.view-list .node-list tbody td.qs-cell[data-level="warn"] { color: var(--warn); }
+body.view-list .node-list tbody td.qs-cell[data-level="crit"] { color: var(--crit); }
+body.view-list .node-list tbody td.qs-cell[data-level="off"]  { color: var(--text-muted); }

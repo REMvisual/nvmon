@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en"{% if app_mode %} class="app-mode"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>{% block title %}nvmon controller{% endblock %}</title>
+
+  <link rel="icon" type="image/svg+xml" href="{{ static_url }}/img/nvmon-favicon.svg">
+
+  {# Cache-bust every asset on every controller version bump so a stale
+     browser cache can never mask a real fix. #}
+  <link rel="stylesheet" href="{{ static_url }}/css/nvmon.css?v={{ controller.version }}{{ cache_bust|default("") }}">
+
+  {# IMPORTANT: load order matters.  nvmon.js registers an `alpine:init`
+     listener — that event fires exactly once when Alpine boots.  If
+     Alpine loads first, the listener never runs and `$store.nvmon` is
+     never created, so every button bound to `$store.nvmon.*` silently
+     no-ops.  We therefore load nvmon.js BEFORE alpine.js, both via
+     `defer` (defer scripts execute in document order, after the HTML is
+     parsed). HTMX and Chart.js have no alpine dependency. #}
+  <script src="{{ static_url }}/vendor/htmx.min.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+  <script src="{{ static_url }}/js/charts.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+  <script src="{{ static_url }}/js/nvmon.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+  <script src="{{ static_url }}/vendor/alpine.min.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+  <script src="{{ static_url }}/vendor/chart.umd.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+
+  {# Set the REM toggle state on <body> BEFORE paint so the gated rows
+     don't flash visible on a hard reload when the user has the toggle off.
+     localStorage key: 'nvmon.rem' = 'on' | 'off' (defaults to 'off'). #}
+  <script>
+    (function () {
+      try {
+        var v = localStorage.getItem('nvmon.rem');
+        document.documentElement.setAttribute('data-rem', v === 'on' ? 'on' : 'off');
+      } catch (e) {
+        document.documentElement.setAttribute('data-rem', 'off');
+      }
+    })();
+  </script>
+
+  {# `nvmon app` (desktop widget) only: window controls + drag-by-header.
+     app_mode is a Jinja global set by nvmon/app.py; the monitor box never
+     sets it, so its dashboard is unchanged. #}
+  {% if app_mode %}
+  <link rel="stylesheet" href="{{ static_url }}/css/app.css?v={{ controller.version }}{{ cache_bust|default("") }}">
+  <script src="{{ static_url }}/js/app.js?v={{ controller.version }}{{ cache_bust|default("") }}" defer></script>
+  {% endif %}
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <a class="skip-link" href="#nodes">Skip to nodes</a>
+
+  {% block header %}
+  <header class="hdr" role="banner">
+    <div class="hdr-brand" aria-label="nvmon by REM">
+      {# Inline glyph (not <img>) so SVG strokes/fills can inherit if needed.
+         Mirrors static/img/nvmon-glyph-transparent.svg but with the beacon
+         hardcoded white for the dark header. #}
+      <svg class="hdr-brand-glyph" viewBox="0 0 180 180" width="32" height="32"
+           aria-hidden="true" focusable="false">
+        <polygon points="90,28 144,59 144,121 90,152 36,121 36,59"
+                 fill="none" stroke="#4A90E2" stroke-width="4" stroke-linejoin="round"/>
+        <g fill="none" stroke="#4A90E2" stroke-width="2" stroke-linejoin="round">
+          <path d="M 90 90 L 71 45 L 49 63 Z"/>
+          <path d="M 90 90 L 43 76 L 43 104 Z"/>
+          <path d="M 90 90 L 71 135 L 49 117 Z"/>
+        </g>
+        <path d="M 90 90 L 138 70 L 138 110 Z" fill="#2DD4BF" fill-opacity="0.5"/>
+        <circle cx="90" cy="90" r="7" fill="#FFFFFF"/>
+      </svg>
+      <span class="hdr-brand-title">
+        <span class="hdr-brand-name">nvmon</span>
+        <button type="button" class="hdr-brand-sub" id="rem-toggle"
+                aria-pressed="false"
+                title="Click to toggle advanced controls (Diagnose, Restart listener)"
+                onclick="(function(b){
+                  var on = document.documentElement.getAttribute('data-rem') !== 'on';
+                  document.documentElement.setAttribute('data-rem', on ? 'on' : 'off');
+                  try { localStorage.setItem('nvmon.rem', on ? 'on' : 'off'); } catch(e){}
+                  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                })(this)">by REM</button>
+        <script>
+          (function () {
+            var b = document.getElementById('rem-toggle');
+            if (b) b.setAttribute('aria-pressed',
+              document.documentElement.getAttribute('data-rem') === 'on' ? 'true' : 'false');
+          })();
+        </script>
+      </span>
+      <span style="color:#666;font-size:11px;font-weight:400;margin-left:6px;font-family:Consolas,monospace;"
+            title="Controller build version. If this doesn't match what you copied, you have a stale process.">
+        v{{ controller.version }}
+      </span>
+    </div>
+
+    <nav class="hdr-counters" aria-live="polite" aria-label="Cluster counters">
+      <span><span class="cnt ok" data-counter="online">{{ controller.nodes_online }}</span>/<span data-counter="total">{{ controller.nodes_online + controller.nodes_offline }}</span> online</span>
+      <span>
+        {% if controller.alerts_count > 0 %}
+          <span class="cnt crit" data-counter="alerts">{{ controller.alerts_count }}</span> alerts
+        {% else %}
+          <span class="cnt ok"   data-counter="alerts">0</span> alerts
+        {% endif %}
+      </span>
+    </nav>
+
+    <div class="hdr-actions">
+      {% block header_actions %}{% endblock %}
+    </div>
+    {% if app_mode %}
+    <div class="app-ctl" role="group" aria-label="Window">
+      <button type="button" data-app="opacity" title="Opacity">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>
+      </button>
+      <button type="button" data-app="pin" title="Keep on top" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4l-.5 4 2.5 2.5H4L6.5 6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 8.5V14" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button type="button" data-app="collapse" title="Collapse to the floating sync widget">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg>
+      </button>
+      <button type="button" data-app="min" title="Minimise to the taskbar">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5h10" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button type="button" data-app="max" title="Maximise / restore">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+      <button type="button" data-app="close" class="app-close" title="Close (the bubble stays)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+    </div>
+    {% endif %}
+  </header>
+  {% endblock %}
+
+  <main id="main" role="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block footer %}
+  <footer class="ftr" role="contentinfo">
+    <span>Controller v{{ controller.version }} &middot; {{ controller.nodes_online + controller.nodes_offline }} nodes &middot; last aggregate {{ controller.last_aggregate }}</span>
+    <span class="stream-state" data-state="{{ controller.stream_status }}" aria-live="polite">
+      stream: <span data-stream-state>{{ controller.stream_status }}</span>
+    </span>
+  </footer>
+  {% endblock %}
+
+  {# Global live-region for toasts / announcements (used by JS) #}
+  <div id="live-region" class="sr-only" role="status" aria-live="polite"></div>
+
+  {# Alpine.js templates and portals live here #}
+  {% block portals %}{% endblock %}
+
+</body>
+</html>

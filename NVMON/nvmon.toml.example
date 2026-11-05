@@ -1,0 +1,211 @@
+# nvmon configuration template.
+# Copy to nvmon.toml and edit for your environment.
+#
+# nvmon loads F:/nvmon/nvmon.toml (or whatever BASE_DIR/nvmon.toml resolves to).
+# If the file is missing, safe defaults are used and a warning is logged.
+
+# ---------------------------------------------------------------------------
+# Agent — per-machine daemon on each render node (HTTP :9998)
+# ---------------------------------------------------------------------------
+
+[agent]
+port = 9998
+poll_interval_seconds = 5
+profile_dir = "./profiles"
+status_file = "./status.json"
+log_dir = "./logs"
+# Agents are unauthenticated on the trusted LAN.
+
+# Boot-time auto-apply is now controlled by the active_profile.json snapshot
+# (BASE_DIR/active_profile.json), not by a toml setting. Click "Apply <X>"
+# from the monitor once and the listener writes the snapshot; every
+# subsequent boot reads it and re-applies if the validator reports drift.
+# A /restore from the monitor clears the snapshot. No per-node toml editing.
+
+# controller_url — when set, the agent push-registers with this controller
+# on boot via POST /register, then heartbeats every register_interval_seconds.
+# Reliable TCP path that doesn't depend on multicast surviving the LAN.
+#
+# ZERO-TOUCH: leave this blank and put the URL in BASE_DIR/monitor.url
+# instead. That single-line file ships in the deployed NVVMON tree, so
+# FreeFileSync mirrors it to every render node automatically — operator
+# edits the URL once in the workspace and every node picks it up on its
+# next boot. The toml value below, when set, overrides monitor.url.
+#
+# Bake the toml value in explicitly via:
+#     install.bat --listener --controller http://<monitor>:9997
+#
+# Empty + no monitor.url file = disabled; rely on mDNS / static
+# [[controller.nodes]] only.
+controller_url = ""
+register_interval_seconds = 60
+
+# sync_card_firmware — RTX PRO Sync firmware version on this node's sync
+# card (e.g. "3.06"). Only used when the agent cannot read it live (the
+# NVCP topology JSON / NVWMI field is missing on some drivers). Drives the
+# Blackwell timing-server advisory: v3.04/v3.06 -> "CONFIRMED", any other
+# value -> advisory suppressed, blank -> generic "may be affected" form.
+sync_card_firmware = ""
+
+# driver_advisories — surface known driver / sync-firmware interactions
+# (e.g. the Blackwell + RTX PRO Sync FW v3.04/v3.06 timing-server bug) in
+# status.advisories and the slide-over. They are informational and never
+# count as agent errors. Set false once you've read them for this fleet.
+driver_advisories = true
+
+# boot_apply_max_uptime_minutes — the boot-apply (replaying active_profile.json
+# when the validator reports drift) only runs when Windows has been up for
+# less than this many minutes. A listener restart later in the day ("Restart
+# listener" to pick up new code, a supervisor respawn) is not a boot — the
+# driver still holds the last applied state — so it is left alone. 0 = always.
+boot_apply_max_uptime_minutes = 15
+
+[agent.gpu]
+temp_warning_c = 85
+power_warning_pct = 95
+
+[agent.displays]
+# Name prefixes to exclude from DD operations (e.g. KVM extender monitors).
+# The FIRST prefix also names the operator display the apply pipeline makes
+# primary (via SetDisplayConfig, modes untouched) before entering
+# DirectDisplay — DD cannot take the primary display, and after a Mosaic
+# rebuild Windows often puts the wall at (0,0). Leave empty on nodes with
+# no operator monitor.
+excluded_name_prefixes = []
+# Resolutions to exclude when the display name is generic/unknown.
+# Each entry is a [width, height] pair.
+excluded_resolutions = []
+
+[agent.bin]
+# Override executable auto-discovery if needed. Leave blank to search
+# F:/nvmon/bin/ first, then PATH.
+nvidia_smi = ""
+configure_mosaic = ""
+configure_ddisplay = ""
+configure_qsync2 = ""
+
+# ---------------------------------------------------------------------------
+# Controller — aggregator + unified dashboard (HTTP :9997)
+# ---------------------------------------------------------------------------
+
+[controller]
+port = 9997
+poll_interval_seconds = 5
+# Per-node timeout for a fleet command (apply / sync / restore ...).
+fanout_timeout_seconds = 15
+# Per-node timeout for the background /health + /status poll. Keep it
+# shorter than poll_interval_seconds x 2 — a dead node must not stall the
+# poll cycle. Default 5.
+poll_timeout_seconds = 5
+# Nodes polled in parallel. 0 = auto (one worker per node, capped at 64) —
+# a 40-server fleet is polled as fast as a 2-server one. Set explicitly only
+# to throttle a slow monitor box.
+poll_workers = 0
+
+# IP LIST — the quickest way to declare a big fleet. One entry per server,
+# "ip" or "ip:port" (default 9998). The controller learns each node's real
+# hostname from its /health on the first poll and shows that on the card;
+# until then the card is labelled with the IP. Groups and
+# apply_excluded_hosts work on the learned hostname. An IP that also appears
+# in a [[controller.nodes]] block below is ignored (the explicit block wins).
+node_ips = [
+  # "10.0.0.11",
+  # "10.0.0.12",
+  # "10.0.0.13:9998",
+]
+# Controller is the only authenticated surface. One shared password, one file.
+# If the file is missing or empty, controller runs with no auth (prints a warning).
+password_file = "F:/nvmon/secrets/controller.password"
+
+# Hostnames the controller will NEVER include in a fleet `Apply Profile`.
+# Sync, Restore, Restart, Restart Listener etc. all still hit them — only
+# profile apply is filtered out. Use this for nodes whose display config
+# differs from the rest of the fleet (e.g. NODE-11 at 1080p while the
+# other render nodes are 4K) until you save them their own profile.
+# Match is case-insensitive on the leading DNS label.
+apply_excluded_hosts = []
+
+# Auto-evict push-registered nodes whose last heartbeat is older than this
+# many hours. Only touches source="registered" entries — operator-declared
+# [[controller.nodes]] and mDNS discovery entries are never affected. A
+# background sweep runs every 5 minutes and persists evictions to
+# secrets/registered_nodes.json so a controller restart doesn't resurrect
+# them. Set to 0 (or any non-positive number) to disable.
+registered_node_ttl_hours = 24
+
+# PER-NODE PROFILES — which profile each node gets on "Re-apply All" when
+# the fleet runs mixed profiles: the QSync master gets the server profile,
+# the daisy-chained clients get the client profile, a 1080p box gets its
+# own. Keys are hostnames (case-insensitive, leading DNS label — so this
+# works with node_ips entries too once their hostname is learned).
+# Precedence at apply time: this map > the node's currently active
+# profile > skipped with a reason. "Apply Profile <X>" (an explicit pick)
+# still pushes X to every node in scope.
+#
+# TEMPLATES (v0.8.2): put the literal token {template} where the shared
+# rate/variant prefix goes, and keep matched profile SETS on disk:
+#     "RENDER-NODE-01" = "{template} - SyncHost"
+#     "RENDER-NODE-02" = "{template} - SyncClient"
+# with profiles "59.94 - SyncHost", "59.94 - SyncClient", "30 - SyncHost",
+# "30 - SyncClient", ... The dashboard "Template" button (and
+# POST /all/template {"template": "30"}) lists every COMPLETE set and
+# applies each node's role profile for the pick in one fan-out. The pick
+# is remembered on the controller; Re-apply All uses it (template_default
+# below until the first pick). Non-templated entries still work as before.
+# template_default = "59.94"
+[controller.node_profiles]
+# "RENDER-NODE-01" = "24_Server"
+# "RENDER-NODE-02" = "24_Client"
+# "RENDER-NODE-03" = "24_Client"
+
+# Known agent nodes. Hostname is a display label; url is where the agent
+# listens. `profile` is the same mapping as node_profiles, inline.
+[[controller.nodes]]
+hostname = "RENDER-NODE-01"
+url = "http://10.0.0.11:9998"
+# profile = "24_Server"
+
+[[controller.nodes]]
+hostname = "RENDER-NODE-02"
+url = "http://10.0.0.12:9998"
+# profile = "24_Client"
+
+# Named groups for targeted fan-out (POST /group/<name>/apply).
+[[controller.groups]]
+name = "outputs"
+nodes = ["RENDER-NODE-01", "RENDER-NODE-02"]
+
+# ---------------------------------------------------------------------------
+# Launcher — app launcher surface (HTTP :9996)
+# ---------------------------------------------------------------------------
+
+[launcher]
+port = 9996
+# List of launchable applications. Empty in Wave 1 — populated in Wave 2.
+apps = []
+
+# ---------------------------------------------------------------------------
+# Network — multi-homed-box overrides
+# ---------------------------------------------------------------------------
+
+[network]
+# SUBNET PIN — the fleet-wide fix for multi-NIC boxes. One CIDR for the
+# network nvmon lives on (e.g. the stage / render LAN). When set:
+#   * agents announce (mDNS) and push-register (POST /register) the local
+#     address that sits inside this subnet, not whatever NIC holds the
+#     default route;
+#   * the controller rejects /register calls whose agent URL or source IP is
+#     outside the subnet (HTTP 403, logged) — static [[controller.nodes]]
+#     entries are never affected;
+#   * /health reports subnet_ok and the dashboard shows an OFF CONTROL-NET
+#     banner on a node with no address in the subnet.
+# Safe to put in a toml that is mirrored to every box. Blank = disabled.
+subnet = ""
+
+# Per-box override for config.get_local_ip(). When set to a non-empty
+# string, that value is used verbatim and beats `subnet` and the auto-detect
+# (which probes via UDP-connect-to-public-target, then DNS-of-self). Only
+# needed on a box that is NOT on the subnet above, or when the toml is not
+# shared. Affects: agent's mDNS announce, agent's push-registration agent_url
+# field, controller's /health response. Takes effect on next process boot.
+announce_ip = ""

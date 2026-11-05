@@ -1,0 +1,51 @@
+configureQsync2: NVIDIA QSYNC2 Configuration Tool Version 2.1 (33393914)
+
+QSync topology:
+------------------------
+   QSync Information
+------------------------
+	Found one local server running at Frequency: 23.976 Hz
+QSync Card number               : 0,   handle:0xdd000000
+	Number of QSync Targets       : 2
+	House Sync Signal Present     : YES
+		House Sync Signal Rate        : 23.976
+		House Sync Trigger           : FALLING EDGE
+		House Sync Sync Type          : COMPOSITE
+		House Sync Skew               : 0
+		House Sync Source             : HOUSE SYNC
+	------------------------
+	QSync Target #0(GPU) NVIDIA RTX A6000:
+	------------------------
+		GPU index             : 0
+		GPU Handle            : 0x6100 (gpuId: 0x6100)
+		Connector             : TERTIARY
+		Proxy GPU Handle      : 0x0
+		Is synced             : NO
+		Is Stereo Synced          : NO
+		Is sync signal available? : YES
+		No of displays        : 4
+		----------
+		Display 0:
+		----------
+			Display index  : 0
+			Display Mask   : 0x4000
+			Display ID     : 0x82061085
+			Can Be Server? : YES
+			Sync State     : SERVER
+			Connector      : DISPLAYPORT_EXTERNAL
+			Refresh Rate   : 23.976 Hz
+		----------
+		Display 1:
+		----------
+			Display index  : 1
+			Display Mask   : 0x1000
+			Display ID     : 0x82061087
+			Can Be Server? : YES
+			Sync State     : CLIENT
+			Connector      : DISPLAYPORT_EXTERNAL
+			Refresh Rate   : 23.976 Hz
+ QSync control params for 0 QSync device:
+ qSyncDevId    : 0
+ source        : HOUSESYNC
+ syncType      : COMPOSITE
+ trigger       : FALLING

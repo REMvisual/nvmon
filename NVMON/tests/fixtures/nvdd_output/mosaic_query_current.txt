@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<query version="2.4.9">
+	<grids>
+		<grid rows="1" columns="1" synchronized="1">
+			<displaymode width="1920" height="1080" bpp="32" freq="60" rr="60.000000" />
+			<position x="0" y="0" />
+			<displays>
+				<display displayid="0x80061082" overlapcolumn="0" overlaprow="0" rotation="0" />
+			</displays>
+		</grid>
+		<grid rows="2" columns="2" synchronized="1" ddisplay="1">
+			<displaymode width="3840" height="2160" bpp="32" freq="24" rr="23.976000" />
+			<displays>
+				<display displayid="0x82061085" overlapcolumn="0" overlaprow="0" rotation="0" />
+				<display displayid="0x82061087" overlapcolumn="0" overlaprow="0" rotation="0" />
+				<display displayid="0x82061081" overlapcolumn="0" overlaprow="0" rotation="0" />
+				<display displayid="0x82061083" overlapcolumn="0" overlaprow="0" rotation="0" />
+			</displays>
+		</grid>
+	</grids>
+</query>

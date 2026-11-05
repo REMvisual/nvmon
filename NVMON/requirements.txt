@@ -1,0 +1,16 @@
+# Runtime dependencies for nvmon (listener + monitor).
+# Python >=3.11 required. tomllib is stdlib; no tomli fallback needed.
+#
+# Keep this lean — every entry here gets installed on every render node.
+# Dev/agent tooling (openviking, etc.) belongs on the parent folder, not here.
+
+# On PyPI the package is named `zeroconf` (the github project is python-zeroconf).
+# >=0.132 pulls in stable goodbye-packet + TXT update API.
+zeroconf>=0.132
+pynvml>=11.5
+psutil>=5.9
+# Templating for the controller's unified dashboard. Pure Python, no native
+# deps. Installed on every render node — agents do not import it (the agent's
+# single-host dashboard uses an inline string builder), so the cost on a
+# listener-only node is just disk: ~150 kB.
+Jinja2>=3.1

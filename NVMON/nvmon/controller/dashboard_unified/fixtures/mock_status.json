@@ -1,0 +1,218 @@
+{
+  "controller": {
+    "version": "0.1.0",
+    "uptime_seconds": 12840,
+    "stream_status": "live",
+    "last_aggregate": "2026-04-17T10:22:34Z",
+    "nodes_online": 7,
+    "nodes_offline": 1,
+    "alerts_count": 2
+  },
+  "groups": [
+    {"name": "outputs", "count": 4, "nodes": ["RN-01", "RN-02", "RN-05", "RN-06"]},
+    {"name": "backups", "count": 2, "nodes": ["RN-03", "RN-07"]},
+    {"name": "dev",     "count": 2, "nodes": ["RN-04", "RN-08"]}
+  ],
+  "alerts": [
+    {
+      "id": "a-4821",
+      "hostname": "RN-02",
+      "severity": "CRITICAL",
+      "type": "QSync Lost",
+      "message": "House sync signal dropped at 10:22:14",
+      "timestamp": "2026-04-17T10:22:14Z",
+      "dismissed": false
+    },
+    {
+      "id": "a-4820",
+      "hostname": "RN-07",
+      "severity": "WARNING",
+      "type": "GPU Temperature High",
+      "message": "GPU 0 temperature reached 86C",
+      "timestamp": "2026-04-17T10:20:02Z",
+      "dismissed": false
+    }
+  ],
+  "nodes": [
+    {
+      "hostname": "RN-01",
+      "ip": "192.0.2.12",
+      "reachable": true,
+      "online": true,
+      "group": "outputs",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 51720,
+      "poll_count": 10340,
+      "last_poll_ms_ago": 2000,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "locked",   "level": "ok"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 58, "power_draw_w": 140, "power_limit_w": 300, "utilization_pct": 42, "sparkline": [55,56,57,58,58,59,60,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58,59,58,57,58,59,60,58,58,57,58]}
+      ],
+      "alerts_count": 0,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-02",
+      "ip": "192.0.2.14",
+      "reachable": true,
+      "online": true,
+      "group": "outputs",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 51600,
+      "poll_count": 10316,
+      "last_poll_ms_ago": 1000,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "unlocked", "level": "crit"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 62, "power_draw_w": 155, "power_limit_w": 300, "utilization_pct": 48, "sparkline": [60,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,63,62,62,63,64,62,61,62,62]}
+      ],
+      "alerts_count": 1,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-03",
+      "ip": "192.0.2.17",
+      "reachable": true,
+      "online": true,
+      "group": "backups",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 52100,
+      "poll_count": 10420,
+      "last_poll_ms_ago": 2000,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "locked",   "level": "ok"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 55, "power_draw_w": 130, "power_limit_w": 300, "utilization_pct": 38, "sparkline": [54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,56,55,55,56,55,54,55,55,55]}
+      ],
+      "alerts_count": 0,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-04",
+      "ip": "192.0.2.18",
+      "reachable": false,
+      "online": false,
+      "group": "dev",
+      "active_profile": null,
+      "uptime_seconds": 0,
+      "poll_count": 0,
+      "last_poll_ms_ago": null,
+      "last_seen": "2026-04-17T10:21:58Z",
+      "subsystems": {},
+      "displays_count": 0,
+      "refresh_hz": 0,
+      "gpu": [],
+      "alerts_count": 0,
+      "capabilities": {}
+    },
+    {
+      "hostname": "RN-05",
+      "ip": "192.0.2.19",
+      "reachable": true,
+      "online": true,
+      "group": "outputs",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 50100,
+      "poll_count": 10020,
+      "last_poll_ms_ago": 1500,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "locked",   "level": "ok"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 60, "power_draw_w": 145, "power_limit_w": 300, "utilization_pct": 44, "sparkline": [58,59,60,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,61,60,59,60,61,60,59,60,60,60,60,60,60]}
+      ],
+      "alerts_count": 0,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-06",
+      "ip": "192.0.2.20",
+      "reachable": true,
+      "online": true,
+      "group": "outputs",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 52340,
+      "poll_count": 10468,
+      "last_poll_ms_ago": 2500,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "locked",   "level": "ok"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 63, "power_draw_w": 148, "power_limit_w": 300, "utilization_pct": 46, "sparkline": [60,61,62,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,64,63,62,63,64,63,62,63,63,63,63,63,63]}
+      ],
+      "alerts_count": 0,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-07",
+      "ip": "192.0.2.21",
+      "reachable": true,
+      "online": true,
+      "group": "backups",
+      "active_profile": "mosaic-2397",
+      "uptime_seconds": 48900,
+      "poll_count": 9780,
+      "last_poll_ms_ago": 3000,
+      "subsystems": {
+        "dd":    {"status": "active",   "level": "ok"},
+        "mosaic":{"status": "2x2",      "level": "ok"},
+        "qsync": {"status": "locked",   "level": "ok"}
+      },
+      "displays_count": 4,
+      "refresh_hz": 23.976,
+      "gpu": [
+        {"index": 0, "temperature_c": 86, "power_draw_w": 180, "power_limit_w": 300, "utilization_pct": 72, "sparkline": [78,79,80,81,82,83,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,87,86,85,84,85,86,86,86,86]}
+      ],
+      "alerts_count": 1,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    },
+    {
+      "hostname": "RN-08",
+      "ip": "192.0.2.22",
+      "reachable": true,
+      "online": true,
+      "group": "dev",
+      "active_profile": "desktop",
+      "uptime_seconds": 3600,
+      "poll_count": 720,
+      "last_poll_ms_ago": 1000,
+      "subsystems": {
+        "dd":    {"status": "inactive", "level": "warn"},
+        "mosaic":{"status": "off",      "level": "warn"},
+        "qsync": {"status": "unlocked", "level": "warn"}
+      },
+      "displays_count": 2,
+      "refresh_hz": 60.0,
+      "gpu": [
+        {"index": 0, "temperature_c": 45, "power_draw_w": 60, "power_limit_w": 300, "utilization_pct": 8, "sparkline": [44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,46,45,45,46,45,44,45,45,45]}
+      ],
+      "alerts_count": 0,
+      "capabilities": {"gpu": true, "displays": true, "mosaic": true, "qsync": true, "edid": true}
+    }
+  ],
+  "profiles_union": ["mosaic-2397", "desktop", "mosaic-1080p"]
+}

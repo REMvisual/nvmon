@@ -1,0 +1,675 @@
+{#
+  HTMX partial — rendered into #slideover-portal on node card click.
+  Route: GET /node/<hostname>/detail
+  Context:
+    node (dict) — aggregated status for this node (see fixtures/mock_status.json)
+#}
+<div class="slideover-backdrop"
+     x-data
+     @click.self="$store.nvmon.closeSlideover()"
+     @keydown.escape.window="$store.nvmon.closeSlideover()"></div>
+
+<aside class="slideover"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="slideover-host-{{ node.hostname }}"
+       x-data="nodeDetail('{{ node.hostname }}')"
+       x-init="init()"
+       x-trap.inert.noscroll="true">
+
+  <div class="slideover-head" x-data="pingButton('{{ node.hostname }}')">
+    <button class="btn btn-ghost btn-icon" type="button"
+            onclick="document.getElementById('slideover-portal').innerHTML='';"
+            aria-label="Close (Esc)">&larr;</button>
+    <h2 id="slideover-host-{{ node.hostname }}">{{ node.hostname }}</h2>
+    <span class="ip">{{ node.ip }}</span>
+    <span class="muted mono">
+      {% if node.online %}ONLINE{% else %}OFFLINE{% endif %}
+    </span>
+    <div class="spacer"></div>
+
+    {# Ping replaces the old ⟳ refresh icon. The user explicitly asked
+       for it: "the reset on the main page and per node should be a
+       'ping' query manually". Click → POSTs /node/<host>/ping → the
+       controller force-probes the agent's /health and reports
+       latency / failure inline next to the button. After a successful
+       ping we also re-fetch the slide-over so subsystems refresh. #}
+    <button class="btn btn-sm" type="button" @click="ping()" :disabled="pinging">
+      <span x-show="!pinging">Ping</span>
+      <span x-show="pinging">Pinging…</span>
+    </button>
+    <span x-show="result" class="mono" style="font-size:11px;"
+          :class="resultClass" x-text="result"></span>
+    {# Top-right "Actions ▾" button removed in v0.5.0 — Actions section
+       lives at the top of the slide-over body, so a duplicate dropdown
+       was just clutter that, when its dropdown silently failed, left
+       the user wondering whether the click did anything. #}
+  </div>
+
+  <div class="slideover-body">
+
+    {# Loud banner when the controller can't reach the agent at all. Shows
+       the URL we tried + the OS-level error string (Connection refused /
+       timed out / DNS failure) so the operator can fix the right thing
+       (firewall, wrong IP in nvmon.toml, agent not started, etc.). #}
+    {% if not node.online %}
+      <div role="alert" style="margin-bottom: 14px; padding: 10px 14px;
+           background: var(--crit-soft); border-left: 3px solid var(--crit);
+           color: var(--text); font-size: 13px;">
+        <strong class="crit">OFFLINE</strong> &mdash;
+        {% if node.last_poll_error %}
+          last poll error: <code class="mono">{{ node.last_poll_error }}</code>
+        {% else %}
+          controller cannot reach the agent.
+        {% endif %}
+        <div class="muted" style="font-size:11px; margin-top:4px; font-family:var(--mono);">
+          Trying: {{ node.url or '(no URL)' }}
+          {% if node.last_seen %} &middot; last reachable: {{ node.last_seen }}{% endif %}
+        </div>
+        <div class="muted" style="font-size:11px; margin-top:6px;">
+          Common causes: agent not started · wrong IP in nvmon.toml ·
+          Windows Firewall blocking 9998 from the controller subnet ·
+          mDNS announce returned a non-routable IP (VPN/virtual NIC).
+        </div>
+      </div>
+    {% endif %}
+
+    {# ---- Apply / restore job (v0.8.0). The agent reports what it is
+         doing right now (step) and the last outcome; while a job runs the
+         agent's status snapshot is paused, so say so instead of letting a
+         frozen reading look live. Cancel = POST /node/<host>/apply/cancel
+         (plain JS, no Alpine, so a busted modal can't disable it). #}
+    {% set job = node.job or {} %}
+    {% if node.online and job.in_progress %}
+      <div role="status" id="job-banner-{{ node.hostname }}"
+           style="margin-bottom: 14px; padding: 10px 14px;
+           background: rgba(56,189,248,0.10); border-left: 3px solid #38bdf8;
+           color: var(--text); font-size: 13px;">
+        <strong>&#x27F3; {{ 'Restoring' if job.action == 'restore' else 'Applying' }}
+          {{ job.profile or '' }}</strong>
+        {% if job.step %}&mdash; <span class="mono" style="font-size:12px;">{{ job.step }}</span>{% endif %}
+        <button class="btn btn-sm btn-danger" type="button" style="margin-left:10px;"
+                onclick="nvmonCancelApply('{{ node.hostname }}')"
+                title="Stop this apply/restore at its next step (the next request wins)">
+          Cancel
+        </button>
+        <div class="muted" style="font-size:11px; margin-top:4px;">
+          Status below is paused while the job owns the NVIDIA tools
+          {% if node.status_age_s %}(snapshot {{ node.status_age_s|round(0)|int }}s old){% endif %}.
+        </div>
+      </div>
+    {% elif node.online and job.known and job.finished_at %}
+      <div class="muted" style="margin-bottom: 10px; font-size: 11px;">
+        Last {{ job.action }} <strong>{{ job.profile }}</strong>:
+        <span class="{{ 'ok' if job.success else ('warn' if job.cancelled else 'crit') }}">
+          {{ 'done' if job.success else ('cancelled' if job.cancelled else 'FAILED') }}
+        </span>
+        {% if job.message and not job.success %}&mdash; {{ job.message }}{% endif %}
+      </div>
+    {% endif %}
+    {% if node.online and node.status_stale and not job.in_progress %}
+      <div role="status" style="margin-bottom: 10px; padding: 6px 12px;
+           background: var(--warn-soft, rgba(255,170,0,0.10)); border-left: 3px solid var(--warn, #ffaa00);
+           font-size: 12px;">
+        <strong class="warn">STALE</strong> &mdash; agent snapshot is
+        {{ node.status_age_s|round(0)|int }}s old (expected &lt; 15s). The listener's
+        NVIDIA queries may be hanging; check its console / Diagnose.
+      </div>
+    {% endif %}
+
+    {# Loud banner when the agent on this node isn't running as admin —
+       configureQsync2.exe / configureDdisplay.exe both refuse without
+       elevation, so QSync reads UNLOCKED and the displays table is empty.
+       The fix is to (re)run run_listener.bat which now auto-elevates. #}
+    {% if node.agent_is_admin is sameas false %}
+      <div role="alert" style="margin-bottom: 14px; padding: 10px 14px;
+           background: var(--crit-soft); border-left: 3px solid var(--crit);
+           color: var(--text); font-size: 13px;">
+        <strong class="crit">AGENT NOT ADMIN</strong> &mdash; the listener on
+        {{ node.hostname }} is running unprivileged, so QSync and DD queries
+        return empty / UNLOCKED. Restart it via <code class="mono">run_listener.bat</code>
+        (auto-elevates as of v0.2.0).
+      </div>
+    {% endif %}
+
+    {# Subnet pin violated: the listener has no address on the configured
+       nvmon LAN and is announcing some other NIC's IP. Static-config nodes
+       still get polled (the operator typed the URL), but QSync/Mosaic
+       fan-out and registration are not guaranteed to be on the stage net. #}
+    {% if node.agent_subnet_ok is sameas false %}
+      <div role="alert" style="margin-bottom: 14px; padding: 10px 14px;
+           background: var(--crit-soft); border-left: 3px solid var(--crit);
+           color: var(--text); font-size: 13px;">
+        <strong class="crit">OFF CONTROL-NET</strong> &mdash; the listener on
+        {{ node.hostname }} announces <code class="mono">{{ node.agent_ip }}</code>,
+        which is outside the configured subnet
+        <code class="mono">{{ node.agent_subnet }}</code>. Check the node's
+        control-net NIC / cable, or its <code class="mono">[network]</code> settings.
+      </div>
+    {% endif %}
+
+    <div class="muted mono" style="margin-bottom: 18px;">
+      Profile: <strong class="mono" style="color: var(--text);">{{ node.active_profile or 'none' }}</strong>
+      &nbsp;·&nbsp; Uptime: {{ (node.uptime_seconds // 3600) }}h {{ (node.uptime_seconds % 3600) // 60 }}m
+      &nbsp;·&nbsp; Polls: {{ node.poll_count }}
+      &nbsp;·&nbsp; Last:
+      {% if node.last_poll_ms_ago is not none %}
+        {{ (node.last_poll_ms_ago / 1000) | round(1) }}s ago
+      {% else %}
+        —
+      {% endif %}
+      {% if node.nvidia_driver_version %}
+        &nbsp;·&nbsp; Driver: <strong class="mono" style="color: var(--text);">{{ node.nvidia_driver_version }}</strong>
+      {% endif %}
+      {% if node.agent_is_admin is sameas true %}
+        &nbsp;·&nbsp; <span class="ok mono">admin</span>
+      {% endif %}
+    </div>
+
+    {# ---- Actions — primary entrypoint, kept at the top so the
+         operator never has to scroll past telemetry to apply or sync. #}
+    <section class="slideover-section" aria-labelledby="h-actions">
+      <h3 id="h-actions">Actions</h3>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-primary" type="button"
+                @click="$store.nvmon.openFanout('apply', {scope: ['{{ node.hostname }}']})">
+          Apply Profile
+        </button>
+        <button class="btn" type="button"
+                @click="$store.nvmon.openFanout('sync', {scope: ['{{ node.hostname }}']})"
+                title="Sync just this node">
+          Sync
+        </button>
+        <button class="btn btn-primary" type="button"
+                @click="$store.nvmon.saveProfileFrom('{{ node.hostname }}')"
+                title="Capture current GPU/display/QSync state as a profile">
+          Save as profile
+        </button>
+        {# Restore only when this node runs DD or Mosaic (see view_model
+           restore_relevant) — on a desktop-only QSync node it just kills sync. #}
+        {% if node.restore_relevant %}
+        <button class="btn btn-danger" type="button"
+                @click="$store.nvmon.openFanout('restore', {scope: ['{{ node.hostname }}']})"
+                title="Return this node's displays to desktop">
+          Restore
+        </button>
+        {% endif %}
+
+        {# DD action buttons — hidden when DD is idle on this node. If
+           DD is currently active OR the operator has the "Show DD"
+           header toggle on, the buttons appear. #}
+        {% set ddraw_actions = (node.raw_status or {}).get('direct_display', {}) %}
+        <span class="{% if not ddraw_actions.get('active') %}optional{% endif %}"
+              data-subsystem="dd" style="display:flex; gap:8px;">
+          <button class="btn" type="button"
+                  hx-post="/node/{{ node.hostname }}/dd/enable"
+                  hx-swap="none">Enable DD</button>
+          <button class="btn" type="button"
+                  hx-post="/node/{{ node.hostname }}/dd/disable"
+                  hx-swap="none">Disable DD</button>
+        </span>
+
+        {# Remove from Registry — only for nodes the listener push-registered.
+           "config" entries are operator-declared in nvmon.toml and must be
+           edited there; "discovery" entries auto-prune when the listener
+           stops announcing. Plain JS handler in nvmon.js (no Alpine) so a
+           busted modal can't disable it. #}
+        {% if node.source == 'registered' %}
+        <button class="btn btn-danger" type="button"
+                onclick="nvmonRemoveFromRegistry('{{ node.hostname }}')"
+                title="Remove this push-registered node. It re-appears if it heartbeats again.">
+          Remove from registry
+        </button>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ---- Primary subsystems (always visible) ---- #}
+    <section class="slideover-section" aria-labelledby="h-subsystems">
+      <h3 id="h-subsystems">Subsystems</h3>
+      <div class="subsystem-grid">
+        {# QSync — primary. Always shown.
+           Card layout is role-aware:
+             SERVER (HOUSESYNC + BNC)  → "Locked to external house sync" + house Hz
+             CLIENT (daisy-chain)      → "Locked to upstream framelock pulse"
+                                          + display refresh as the meaningful rate
+             SERVER (no BNC, source=HOUSESYNC) → daisy-chain slave (chain)
+             unlocked / locked-to-self / no card → reason in the Status row
+           The single Status line replaces the previous three rows
+           (State / House Sync / House Hz) which each told only part of
+           the story and confused operators on client nodes. #}
+        {% set q = node.subsystems.get('qsync', {'status':'unknown','level':'off'}) %}
+        {% set qraw = (node.raw_status or {}).get('qsync', {}) %}
+        {% set qrole = (qraw.get('role') or '') | lower %}
+        {% set lock_label = qraw.get('lock_source_label') or '' %}
+        {% set lock_hz = qraw.get('effective_lock_hz') or 0 %}
+        {# For clients, the parser leaves effective_lock_hz=0 because it
+           doesn't have the display refresh handy. Substitute it here so
+           the operator sees a real Hz number. #}
+        {% if qrole == 'client' and (not lock_hz or lock_hz == 0) %}
+          {% set lock_hz = node.refresh_hz or 0 %}
+        {% endif %}
+        {% set badge_label = (q.status | upper) %}
+        {% if q.status in ('locked', 'chain', 'client') and qrole %}
+          {% set badge_label = 'LOCKED · ' ~ (qrole | upper) %}
+        {% endif %}
+        <div class="subsystem">
+          <div class="head">
+            <span class="title">QSync</span>
+            <span class="badge {{ q.level }}">{{ badge_label }}</span>
+          </div>
+          <div class="kv"><span class="k">Status</span><span class="v">
+            {% if q.status == 'client' %}Locked to upstream framelock pulse
+            {% elif q.status == 'locked' %}Locked to external house sync
+            {% elif q.status == 'chain' %}Daisy-chain slave (no BNC, locked via upstream)
+            {% elif q.status == 'locked-to-self' %}Locked to internal clock — NOT fleet sync
+            {% elif q.status == 'house-only' %}House sync signal present but QSync not engaged
+            {% elif q.status == 'no card' %}No QSync hardware
+            {% elif q.status == 'unlocked' %}Not locked
+            {% else %}{{ q.status }}{% endif %}
+          </span></div>
+          {# v0.8.2: chain consistency — which server this client follows and
+             why the chain is wrong (upstream unlocked / rate mismatch). #}
+          {% set chain = node.chain or {} %}
+          {% if chain.upstream or chain.detail %}
+          <div class="kv"><span class="k">Upstream</span><span class="v" {% if chain.level == 'warn' %}style="color:var(--warn);"{% endif %}>
+            {{ chain.upstream or '—' }}
+            {% if chain.detail %}<span style="font-size:11px; {% if chain.level != 'warn' %}color:var(--text-muted);{% endif %}">&middot; {{ chain.detail }}</span>{% endif %}
+          </span></div>
+          {% endif %}
+          {% if lock_hz and lock_hz > 0 %}
+          <div class="kv"><span class="k">Lock rate</span><span class="v">{{ '%.3f'|format(lock_hz) }}Hz
+            {% if qrole == 'client' %}<span class="muted" style="font-size:11px;">(framelock pulse)</span>
+            {% elif qraw.get('house_sync_detected') %}<span class="muted" style="font-size:11px;">(BNC)</span>
+            {% endif %}
+          </span></div>
+          {% endif %}
+          <div class="kv"><span class="k">Source</span><span class="v">{{ qraw.get('source') or '—' }}
+            {% if qrole == 'client' and (qraw.get('source') or '') | upper in ('VSYNC', 'INTERNAL', '') %}
+            <span class="muted" style="font-size:11px;">(expected for client — no BNC)</span>
+            {% endif %}
+          </span></div>
+          <div class="kv"><span class="k">Trigger</span><span class="v">{{ qraw.get('trigger') or '—' }}</span></div>
+          {% set per_gpu = qraw.get('per_gpu_sync') or [] %}
+          {% if per_gpu %}
+          <div class="kv"><span class="k">Per-GPU</span><span class="v" style="font-size:12px;">
+            {# The agent serialises GPUSyncInfo.effective_synced as `synced`
+               (and the raw configureQsync2 flag as `raw_synced`). Reading
+               `effective_synced` here was always undefined -> every GPU
+               rendered UNLOCKED on a locked node. #}
+            {% for g in per_gpu %}GPU{{ g.gpu }}: {% if g.synced %}locked{% else %}UNLOCKED{% endif %}{% if g.sync_note %} <span class="muted">({{ g.sync_note }})</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
+          </span></div>
+          {% endif %}
+        </div>
+
+        {# Output health — primary. Shows res / refresh / displays count. #}
+        {% set oh = (node.raw_status or {}).get('output_health', {}) %}
+        <div class="subsystem">
+          <div class="head">
+            <span class="title">Output</span>
+            <span class="badge {{ 'ok' if oh.get('all_same_refresh') and node.refresh_hz else 'warn' }}">
+              {{ '%.3f'|format(node.refresh_hz) }}Hz
+            </span>
+          </div>
+          <div class="kv"><span class="k">Displays</span><span class="v">{{ node.displays_count }}</span></div>
+          <div class="kv"><span class="k">Resolution</span><span class="v">{{ node.resolution_text or '—' }}</span></div>
+          <div class="kv"><span class="k">Refresh</span><span class="v">{{ '%.3f'|format(node.refresh_hz) }}Hz</span></div>
+          {# Uniformity rows are only meaningful with multi-display setups —
+             a single display is trivially uniform with itself. The user
+             explicitly asked to drop these for single-display nodes. #}
+          {% if node.displays_count and node.displays_count > 1 %}
+            <div class="kv"><span class="k">Uniform res</span>
+              <span class="v {{ 'ok' if oh.get('all_same_resolution') else 'warn' }}">
+                {{ 'yes' if oh.get('all_same_resolution') else 'mixed' }}
+              </span>
+            </div>
+            <div class="kv"><span class="k">Uniform Hz</span>
+              <span class="v {{ 'ok' if oh.get('all_same_refresh') else 'warn' }}">
+                {{ 'yes' if oh.get('all_same_refresh') else 'mixed' }}
+              </span>
+            </div>
+          {% endif %}
+        </div>
+
+        {# EDID — hidden when no overrides and no files on this node.
+           Force-shows when overrides/files exist OR the "Show EDID"
+           toggle is on.
+           Note: the previous "Overrides" count was the total of every
+           monitor instance Windows has ever seen (whether overridden
+           or not), which read like "lots of overrides applied" when
+           in fact none were. We now surface only the active count. #}
+        {% set ed = (node.raw_status or {}).get('edid', {}) %}
+        {% set ed_overrides = ed.get('registry_overrides') or {} %}
+        {% set ed_active = ed_overrides.values() | select | list | length if ed_overrides else 0 %}
+        {% set ed_files = (ed.get('edid_files') or []) | length %}
+        {% set ed_details = ed.get('active_details') or None %}
+        {% set ed_in_use = ed_active > 0 or ed_files > 0 %}
+        <div class="subsystem {% if not ed_in_use %}optional{% endif %}" data-subsystem="edid">
+          <div class="head">
+            <span class="title">EDID {% if not ed_in_use %}<span class="muted" style="font-size:10px;">(optional)</span>{% endif %}</span>
+            <span class="badge {{ 'ok' if ed_in_use else 'off' }}">
+              {% if ed_active > 0 %}{{ ed_active }} OVERRIDE{{ 's' if ed_active != 1 else '' }}{% elif ed_files > 0 %}{{ ed_files }} FILE{{ 's' if ed_files != 1 else '' }}{% else %}IDLE{% endif %}
+            </span>
+          </div>
+          <div class="kv"><span class="k">Active overrides</span><span class="v">{{ ed_active }}</span></div>
+          <div class="kv"><span class="k">Files</span><span class="v">{{ ed_files }}</span></div>
+          {% if ed_details and ed_details.valid %}
+            {% if ed_details.source_file %}
+              <div class="kv">
+                <span class="k">Source file</span>
+                <span class="v" style="font-family:var(--mono); font-size:11px;">{{ ed_details.source_file }}</span>
+              </div>
+            {% endif %}
+            {% if ed_details.monitor_name %}
+              <div class="kv"><span class="k">Monitor</span><span class="v">{{ ed_details.monitor_name }}</span></div>
+            {% endif %}
+            {% if ed_details.manufacturer %}
+              <div class="kv">
+                <span class="k">Manufacturer</span>
+                <span class="v">
+                  {{ ed_details.manufacturer }}
+                  {%- if ed_details.year_of_manufacture and ed_details.year_of_manufacture > 1990 %}
+                    · {{ ed_details.year_of_manufacture }}{% if ed_details.week_of_manufacture %} wk {{ ed_details.week_of_manufacture }}{% endif %}
+                  {%- endif %}
+                </span>
+              </div>
+            {% endif %}
+            {% if ed_details.preferred_mode %}
+              <div class="kv">
+                <span class="k">Preferred</span>
+                <span class="v" style="font-family:var(--mono); font-size:11px;">{{ ed_details.preferred_mode }}</span>
+              </div>
+            {% endif %}
+            <div class="kv">
+              <span class="k">EDID</span>
+              <span class="v muted" style="font-size:11px;">
+                v{{ ed_details.edid_version }} · {{ ed_details.size_bytes }} bytes
+                {%- if ed_details.extension_count and ed_details.extension_count > 0 %} · {{ ed_details.extension_count }} ext{% endif %}
+                {%- if ed_details.distinct_blobs and ed_details.distinct_blobs > 1 %} · ⚠ {{ ed_details.distinct_blobs }} variants{% endif %}
+              </span>
+            </div>
+          {% endif %}
+        </div>
+
+        {# Profile — primary. #}
+        <div class="subsystem">
+          <div class="head">
+            <span class="title">Profile</span>
+            <span class="badge {{ 'ok' if node.active_profile else 'off' }}">
+              {{ (node.active_profile or 'NONE') | upper }}
+            </span>
+          </div>
+          {% set v = node.validation or {} %}
+          {# `checks` is already filtered by the view-model: any check whose
+             detail says "not required by profile" (or has skipped=True) is
+             dropped. A green tick saying "DD not required by profile" is
+             noise; the operator only cares about checks with an opinion. #}
+          {% set checks = v.get('checks') or {} %}
+          {% set passing = checks.values() | selectattr('passed') | list | length %}
+          {% set failing = (checks | length) - passing %}
+          {% if checks %}
+            <div class="kv">
+              <span class="k">Validation</span>
+              <span class="v {{ 'ok' if failing == 0 else 'warn' }}">
+                {{ 'pass' if failing == 0 else (failing|string + ' fail') }}
+              </span>
+            </div>
+            <div class="kv"><span class="k">Pass / total</span><span class="v">{{ passing }} / {{ checks | length }}</span></div>
+            <div class="kv"><span class="k">Errors</span><span class="v">{{ (node.errors or []) | length }}</span></div>
+            <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:11px; line-height:1.5;">
+              {% for name, c in checks.items() %}
+                <div style="display:flex; gap:6px; align-items:flex-start;">
+                  <span class="{{ 'ok' if c.passed else 'crit' }}" style="font-family:var(--mono); font-weight:700;">
+                    {{ '✓' if c.passed else '✗' }}
+                  </span>
+                  <span style="font-family:var(--mono); flex-shrink:0; min-width:96px;">{{ name }}</span>
+                  <span class="muted" style="font-size:11px;">{{ c.detail }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="kv"><span class="k">Validation</span><span class="v muted">no checks applicable to this profile</span></div>
+            <div class="kv"><span class="k">Errors</span><span class="v">{{ (node.errors or []) | length }}</span></div>
+          {% endif %}
+        </div>
+
+        {# DirectDisplay — hidden when DD is idle on this node. Force-
+           shows when DD is active OR the "Show DD" toggle is on. #}
+        {% set dd = node.subsystems.get('dd', {'status':'unknown','level':'off'}) %}
+        {% set ddraw = (node.raw_status or {}).get('direct_display', {}) %}
+        {% set dd_in_use = ddraw.get('active') %}
+        <div class="subsystem {% if not dd_in_use %}optional{% endif %}" data-subsystem="dd">
+          <div class="head">
+            <span class="title">DirectDisplay {% if not dd_in_use %}<span class="muted" style="font-size:10px;">(optional)</span>{% endif %}</span>
+            <span class="badge {{ dd.level }}">{{ dd.status | upper }}</span>
+          </div>
+          <div class="kv"><span class="k">Active</span><span class="v">{{ 'yes' if ddraw.get('active') else 'no' }}</span></div>
+          <div class="kv"><span class="k">Displays</span><span class="v">{{ ddraw.get('display_count') or 0 }}</span></div>
+        </div>
+
+        {# Mosaic — hidden when not enabled on this node. Force-shows
+           when Mosaic is enabled OR the "Show Mosaic" toggle is on. #}
+        {% set ms = node.subsystems.get('mosaic', {'status':'unknown','level':'off'}) %}
+        {% set msraw = (node.raw_status or {}).get('mosaic', {}) %}
+        {% set ms_in_use = msraw.get('enabled') %}
+        <div class="subsystem {% if not ms_in_use %}optional{% endif %}" data-subsystem="mosaic">
+          <div class="head">
+            <span class="title">Mosaic {% if not ms_in_use %}<span class="muted" style="font-size:10px;">(optional)</span>{% endif %}</span>
+            <span class="badge {{ ms.level }}">{{ ms.status | upper }}</span>
+          </div>
+          <div class="kv"><span class="k">Enabled</span><span class="v">{{ 'yes' if msraw.get('enabled') else 'no' }}</span></div>
+          <div class="kv"><span class="k">Grid</span><span class="v">{{ ms.status }}</span></div>
+          <div class="kv"><span class="k">Sync</span><span class="v">{{ 'yes' if msraw.get('synchronized') else 'no' }}</span></div>
+          {% set pdr = msraw.get('per_display_resolution') or [0,0] %}
+          <div class="kv"><span class="k">Per-display</span><span class="v">{{ pdr[0] }}x{{ pdr[1] }}</span></div>
+        </div>
+      </div>
+    </section>
+
+    {# ---- GPU telemetry charts ---- #}
+    <section class="slideover-section" aria-labelledby="h-gpu">
+      <h3 id="h-gpu">GPU Telemetry (last 1h)</h3>
+      <div class="chart-grid">
+        <div>
+          <div class="muted mono" style="font-size:11px; margin-bottom:4px;">
+            Temperature (°C)
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-temp-{{ node.hostname }}"
+                    data-chart="temperature"
+                    data-hostname="{{ node.hostname }}"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="muted mono" style="font-size:11px; margin-bottom:4px;">
+            Power (W)
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-power-{{ node.hostname }}"
+                    data-chart="power"
+                    data-hostname="{{ node.hostname }}"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ---- Displays table — primary view of timings/res/fps/color ---- #}
+    <section class="slideover-section" aria-labelledby="h-displays">
+      <h3 id="h-displays">Displays — resolution / refresh / color</h3>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>GPU</th>
+            <th>Resolution</th>
+            <th>Refresh</th>
+            <th>Color</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if node.displays and node.displays|length > 0 %}
+            {% for d in node.displays %}
+              <tr>
+                <td>{{ d.name }}</td>
+                <td>GPU {{ d.gpu_index }} / #{{ d.display_index }}</td>
+                <td>{{ d.resolution[0] }}x{{ d.resolution[1] }}</td>
+                <td>
+                  {{ '%.3f'|format(d.refresh_rate) }}Hz
+                  {% if d.refresh_fraction %}
+                    <span class="muted" style="font-size:10px;">({{ d.refresh_fraction }})</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if d.color_space or d.bits_per_channel %}
+                    {{ d.color_space or '?' }}
+                    {% if d.bits_per_channel %} · {{ d.bits_per_channel }}bpc{% endif %}
+                    {% if d.pixel_encoding %} · {{ d.pixel_encoding }}{% endif %}
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="{{ 'ok' if 'removed' in d.status|lower else 'warn' }}">{{ d.status }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="6" class="muted">No displays reported.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </section>
+
+    {# ---- Errors (when the agent flagged something) ---- #}
+    {% if node.errors and node.errors|length > 0 %}
+      <section class="slideover-section" aria-labelledby="h-errors">
+        <h3 id="h-errors">Agent errors</h3>
+        <ul class="warn" style="font-family: var(--mono); font-size: 12px; padding-left: 20px;">
+          {% for e in node.errors %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {# ---- Advisories: informational driver / firmware notes. Muted and
+         collapsed — these are "good to know", not faults. Agents with
+         [agent].driver_advisories = false send none. #}
+    {% if node.advisories and node.advisories|length > 0 %}
+      <details class="slideover-section" style="margin-top:8px;">
+        <summary class="muted" style="cursor:pointer; font-size:12px;">
+          Advisories ({{ node.advisories|length }}) — informational, click to read
+        </summary>
+        <ul class="muted" style="font-family: var(--mono); font-size: 11px; padding-left: 20px; line-height:1.5;">
+          {% for a in node.advisories %}
+            <li>{{ a }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+
+    {# ---- Diagnose: raw NVIDIA CLI dumps -----------------------------
+         Collapsed by default — operator clicks the section header to
+         reveal the per-subsystem raw-output buttons. The buttons only
+         hit /node/<h>/<sub>/raw when the user explicitly clicks them,
+         so there's no extra cost for keeping this section in the DOM. #}
+    <section class="slideover-section rem-gated" aria-labelledby="h-diagnose"
+             x-data="Object.assign(rawDump('{{ node.hostname }}'), { open: false })">
+      <h3 id="h-diagnose"
+          style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px;"
+          @click="open = !open">
+        <span x-text="open ? '▼' : '▶'" style="font-size:10px; color:var(--text-muted);"></span>
+        Diagnose — raw CLI output
+        <span class="muted" style="font-size:11px; font-weight:400;">(click to expand)</span>
+      </h3>
+      <div x-show="open" x-cloak style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm" type="button" @click="show('qsync')">QSync raw</button>
+        <button class="btn btn-sm" type="button" @click="show('displays')">Displays raw</button>
+        <button class="btn btn-sm" type="button" @click="show('mosaic')">Mosaic raw</button>
+        <a class="btn btn-sm" target="_blank"
+           href="/node/{{ node.hostname }}/logs?lines=200">Logs (last 200)</a>
+      </div>
+      <template x-if="open && loading">
+        <div class="muted" style="margin-top:8px; font-size:12px;">Running command on {{ node.hostname }}…</div>
+      </template>
+      <template x-if="open && error">
+        <div class="crit" style="margin-top:8px; font-size:12px; font-family:var(--mono);"
+             x-text="'error: ' + error"></div>
+      </template>
+      <template x-if="open && data">
+        <div style="margin-top:10px;">
+          <div class="muted" style="font-size:11px; font-family:var(--mono); margin-bottom:4px;">
+            <span x-text="data.command || '(no exe)'"></span>
+            <span x-show="data.return_code !== undefined">· rc=<span x-text="data.return_code"></span></span>
+            <span x-show="data.duration_ms !== undefined">· <span x-text="data.duration_ms"></span>ms</span>
+          </div>
+          <pre style="background:var(--surface-lo); border:1px solid var(--border); border-radius:var(--radius);
+                      padding:10px; font-size:11px; max-height:280px; overflow:auto; white-space:pre-wrap;
+                      word-break:break-all; color:var(--text); font-family:var(--mono);"
+               x-text="data.stdout || data.stderr || data.reason || '(empty)'"></pre>
+          <details style="margin-top:6px;">
+            <summary class="muted" style="font-size:11px; cursor:pointer;">parsed view</summary>
+            <pre style="background:var(--surface-lo); border:1px solid var(--border); border-radius:var(--radius);
+                        padding:10px; font-size:11px; max-height:200px; overflow:auto; color:var(--text-muted);
+                        font-family:var(--mono);"
+                 x-text="JSON.stringify(data.parsed, null, 2)"></pre>
+          </details>
+        </div>
+      </template>
+    </section>
+
+    {# ---- Power — restart / shutdown this node ----------------------
+         Collapsed by default (matches the Diagnose pattern) so it can't
+         be hit on a wandering click. Two-step window.confirm chain in
+         openPower() gates the actual fanout — second confirm explains
+         the asymmetric recovery semantics (restart auto-recovers via
+         the Scheduled Task; shutdown stays off until physical power on
+         or Wake-on-LAN).
+
+         Hidden entirely on the controller's own card: the dashboard
+         refuses to power-cycle the monitor box. The controller's API
+         layer ALSO refuses (defense in depth) so a curl bypass can't
+         work either. #}
+    {% if not node.is_self %}
+    <section class="slideover-section" aria-labelledby="h-power"
+             x-data="{ open: false }">
+      <h3 id="h-power"
+          style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px;"
+          @click="open = !open">
+        <span x-text="open ? '▼' : '▶'" style="font-size:10px; color:var(--text-muted);"></span>
+        Power — restart / shutdown
+        <span class="muted" style="font-size:11px; font-weight:400;">(click to expand)</span>
+      </h3>
+      <div x-show="open" x-cloak style="margin-top:8px;">
+        <div class="muted" style="font-size:11px; margin-bottom:8px;">
+          Restart auto-recovers via the <code class="mono">nvmon Listener</code> Scheduled
+          Task on next logon. Shutdown stays off until physical power-on / Wake-on-LAN.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-danger btn-sm" type="button"
+                  @click="$store.nvmon.openPower('restart', {scope: ['{{ node.hostname }}']})">
+            Restart this machine…
+          </button>
+          <button class="btn btn-danger btn-sm" type="button"
+                  @click="$store.nvmon.openPower('shutdown', {scope: ['{{ node.hostname }}']})">
+            Shutdown this machine…
+          </button>
+        </div>
+      </div>
+    </section>
+    {% else %}
+    <section class="slideover-section" aria-labelledby="h-power-self">
+      <h3 id="h-power-self">Power</h3>
+      <div class="muted" style="font-size:12px;">
+        This is the monitor (controller) machine. Power actions are
+        intentionally disabled here — the dashboard cannot restart or
+        shut down the box it's running on. Use the OS Start menu or
+        <code class="mono">shutdown.exe</code> at the local console if
+        you need to restart the controller.
+      </div>
+    </section>
+    {% endif %}
+
+    {# Actions section moved to the top of the slide-over body. #}
+
+  </div>
+</aside>

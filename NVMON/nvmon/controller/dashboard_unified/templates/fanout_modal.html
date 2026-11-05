@@ -1,0 +1,142 @@
+{#
+  HTMX/Alpine partial — rendered into #modal-portal on fan-out trigger.
+  Context:
+    action   — 'apply' | 'sync' | 'restore'
+    scope    — list of target hostnames (pre-filtered by group/selection)
+    skipped  — list of {hostname, reason} (offline, missing capability)
+    profiles — list[str] of union profiles (apply only)
+#}
+{# Plain-JS escape hatch: the onclick="..." attributes don't depend on
+   Alpine being bound. If Alpine fails to initialize the x-data tree
+   (which manifests as a grey backdrop with no modal contents), the
+   user can still click the backdrop or the × button to dismiss the
+   modal and return to the dashboard. #}
+<div class="modal-backdrop"
+     onclick="if (event.target === this) document.getElementById('modal-portal').innerHTML='';"
+     x-data="fanoutModal({
+       action: '{{ action }}',
+       scope: {{ scope | tojson }},
+       skipped: {{ skipped | tojson }},
+       profiles: {{ profiles | tojson }}
+     })"
+     @click.self="close()"
+     @keydown.escape.window="close()">
+
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fanout-title"
+       x-trap.inert.noscroll="true">
+
+    <div class="modal-head" style="display:flex; align-items:flex-start; gap:12px;">
+      <div style="flex:1;">
+        <h2 id="fanout-title" x-text="title()"></h2>
+        <div class="muted mono" style="font-size:12px; margin-top:4px;" x-text="subtitle()"></div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon"
+              onclick="document.getElementById('modal-portal').innerHTML='';"
+              aria-label="Close">×</button>
+    </div>
+
+    <div class="modal-body">
+
+      {# ---- Stage 1: picker + confirm ---- #}
+      <template x-if="stage === 'confirm'">
+        <div>
+          <template x-if="action === 'apply'">
+            <div>
+              <div class="muted" style="margin-bottom:6px; font-size:12px;">Profile</div>
+              <div class="profile-list" role="radiogroup" aria-label="Profile">
+                <template x-for="p in profiles" :key="p">
+                  <label>
+                    <input type="radio" name="profile" x-model="selectedProfile" :value="p">
+                    <span class="mono" x-text="p"></span>
+                  </label>
+                </template>
+                <template x-if="profiles.length === 0">
+                  <div class="muted" style="padding:10px;">No profiles common to all online nodes.</div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div class="target-list">
+            <div style="margin-bottom:4px;">
+              Target nodes (<span x-text="scope.length"></span>):
+            </div>
+            <template x-for="host in scope" :key="host">
+              <div><span class="ok">[x]</span> <span x-text="host"></span></div>
+            </template>
+            <template x-for="s in skipped" :key="s.hostname">
+              <div><span class="skip">[ ]</span> <span x-text="s.hostname"></span> (<span x-text="s.reason"></span>)</div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      {# ---- Stage 2: progress ---- #}
+      <template x-if="stage === 'progress'">
+        <div>
+          <div class="progress-list" aria-live="polite">
+            <template x-for="row in progress" :key="row.hostname">
+              <div :class="'row ' + row.state">
+                <span class="host" x-text="row.hostname"></span>
+                <span class="mono" x-text="row.stateLabel"></span>
+                <span class="dur" x-text="row.durationText"></span>
+              </div>
+            </template>
+          </div>
+          <div class="muted mono" style="margin-top: 10px; font-size:12px;">
+            <span x-text="doneCount()"></span> / <span x-text="scope.length"></span> done
+          </div>
+        </div>
+      </template>
+
+      {# ---- Stage 3: summary ---- #}
+      <template x-if="stage === 'summary'">
+        <div>
+          <div style="margin-bottom: 10px; font-family: var(--mono);">
+            Applied <strong x-text="selectedProfile || action"></strong>
+          </div>
+          <ul style="list-style:none; font-family: var(--mono); font-size:13px;">
+            <li class="ok" style="margin-bottom:4px;">
+              ✓ <span x-text="summary.succeeded"></span> succeeded
+            </li>
+            <li class="crit" style="margin-bottom:4px;" x-show="summary.failed > 0">
+              ✗ <span x-text="summary.failed"></span> failed
+            </li>
+            <li class="muted" style="margin-bottom:4px;" x-show="summary.skipped > 0">
+              — <span x-text="summary.skipped"></span> skipped
+            </li>
+          </ul>
+          <template x-if="summary.failures && summary.failures.length > 0">
+            <div style="margin-top:10px; font-size:12px;">
+              <div class="muted" style="margin-bottom:4px;">Failures:</div>
+              <template x-for="f in summary.failures" :key="f.hostname">
+                <div class="crit mono"><span x-text="f.hostname"></span>: <span x-text="f.error"></span></div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+    </div>
+
+    <div class="modal-foot">
+      <template x-if="stage === 'confirm'">
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-ghost" @click="close()">Cancel</button>
+          <button type="button" class="btn btn-primary"
+                  :disabled="action === 'apply' && !selectedProfile"
+                  @click="start()">
+            <span x-text="action === 'apply' ? 'Apply' : (action === 'sync' ? 'Sync' : 'Restore')"></span>
+          </button>
+        </div>
+      </template>
+      <template x-if="stage === 'progress'">
+        <button type="button" class="btn btn-danger" @click="cancel()">Cancel remaining</button>
+      </template>
+      <template x-if="stage === 'summary'">
+        <button type="button" class="btn btn-primary" @click="close()">Close</button>
+      </template>
+    </div>
+
+  </div>
+</div>

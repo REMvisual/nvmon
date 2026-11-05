@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="nvmon">
+  <title>nvmon</title>
+  <polygon points="90,28 144,59 144,121 90,152 36,121 36,59"
+           fill="#0A0A12" stroke="#4A90E2" stroke-width="6" stroke-linejoin="round"/>
+  <g fill="none" stroke="#4A90E2" stroke-width="3" stroke-linejoin="round">
+    <path d="M 90 90 L 71 45 L 49 63 Z"/>
+    <path d="M 90 90 L 43 76 L 43 104 Z"/>
+    <path d="M 90 90 L 71 135 L 49 117 Z"/>
+  </g>
+  <path d="M 90 90 L 138 70 L 138 110 Z" fill="#2DD4BF" fill-opacity="0.6"/>
+  <circle cx="90" cy="90" r="9" fill="#FFFFFF"/>
+</svg>

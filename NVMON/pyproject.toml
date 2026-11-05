@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nvmon"
+version = "0.9.0"
+description = "Monitoring and control daemon for NVIDIA Windows render nodes"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "nvmon" },
+]
+keywords = ["nvidia", "mosaic", "qsync", "directdisplay", "monitoring", "render"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "python-zeroconf>=0.131",
+    "pynvml>=11.5",
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+]
+
+[project.scripts]
+nvmon = "nvmon.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nvmon*"]
+exclude = ["tests*", "docs*"]

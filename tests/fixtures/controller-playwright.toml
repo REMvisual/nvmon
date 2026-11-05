@@ -1,0 +1,15 @@
+# Controller config for the Playwright run (tests/v080-fleet.spec.ts).
+# No auth (password_file points nowhere), IP-list node declaration:
+#   127.0.0.1:9998  = this box's real nvmon agent
+#   127.0.0.1:19997 = tests/fixtures/fake_applying_agent.py
+[controller]
+port = 9997
+poll_interval_seconds = 3
+fanout_timeout_seconds = 10
+poll_timeout_seconds = 4
+password_file = "C:/does-not-exist/controller.password"
+node_ips = ["127.0.0.1:9998", "127.0.0.1:19997"]
+
+[[controller.groups]]
+name = "playwright"
+nodes = ["127.0.0.1:9998", "127.0.0.1:19997"]

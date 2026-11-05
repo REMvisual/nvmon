@@ -1,0 +1,38 @@
+/* nvmon app (desktop widget) only — loaded when app_mode is set. */
+
+/* The header is the window's title bar: drag it to move, double-click to
+   maximise. No text selection while dragging. */
+html.app-mode .hdr { user-select: none; -webkit-user-select: none; cursor: default; }
+html.app-mode .hdr input { user-select: text; -webkit-user-select: text; }
+/* The header is one slim row with the window buttons at its top-right.
+   On a window too narrow for every action, the actions (and only they)
+   flow onto a second row inside the header; labels never break. */
+html.app-mode .hdr { flex-wrap: nowrap; align-items: flex-start; padding-top: 6px; padding-bottom: 6px; }
+html.app-mode .hdr > * { align-self: center; }
+html.app-mode .hdr-actions { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; min-width: 0; }
+html.app-mode .hdr-actions .btn,
+html.app-mode .hdr-actions button,
+html.app-mode .hdr-counters,
+html.app-mode .hdr-brand { white-space: nowrap; }
+@media (max-width: 1180px) {
+  html.app-mode .hdr-brand > span[title],          /* build version */
+  html.app-mode .hdr-actions .ctx { display: none; } /* "7 nodes" */
+}
+html.app-mode .app-ctl {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 2px;
+  margin-left: 4px; padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+html.app-mode .app-ctl button {
+  width: 34px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 6px;
+  color: var(--text-muted); cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+html.app-mode .app-ctl button svg { width: 15px; height: 15px; }
+html.app-mode .app-ctl button:hover { background: #262626; color: var(--text); }
+html.app-mode .app-ctl button[aria-pressed="true"] { color: var(--ok); }
+html.app-mode .app-ctl .app-close:hover { background: #c42b1c; color: #fff; }
+html.app-mode .app-ctl button:focus-visible { outline: 1px dashed var(--brand); outline-offset: 1px; }
