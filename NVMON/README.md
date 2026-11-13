@@ -16,9 +16,18 @@ validation — exposed over HTTP, usable from a browser or from scripts.
 Every render node shows up as a card on the controller's dashboard at
 `:9997`. Live status, GPU temps, sync state, validation pass/fail, and
 per-node action menus all hang off the same view. Fan-out actions across
-the entire fleet (Re-apply All, Sync All, Restore) sit in the header.
+the entire fleet (Re-apply All, Template, Sync All, and the power menu) sit
+in the header.
 
-![nvmon dashboard](docs/screenshots/dashboard-home.png)
+![nvmon dashboard, grid view](docs/screenshots/dashboard-home.png)
+
+![nvmon dashboard, list view](docs/screenshots/dashboard-list.png)
+
+![nvmon dashboard with a QSync Lost alert](docs/screenshots/dashboard-alert.png)
+
+![nvmon per-node detail](docs/screenshots/node-detail.png)
+
+<sub>Screenshots show the built-in demo fleet (`nvmon/controller/dashboard_unified/fixtures/mock_status.json`), not a live site.</sub>
 
 The controller is the only authenticated surface — one shared password in
 `secrets/controller.password`. Browsers get the login form below; API

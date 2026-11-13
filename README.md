@@ -21,9 +21,28 @@ HTTP and usable from a browser or from scripts.
 The controller exposes the unified fleet dashboard at `http://<monitor>:9997`.
 Every node appears as a card with live status, GPU telemetry, sync state,
 and per-node actions. Fan-out actions across the whole fleet (Re-apply All,
-Sync All, Restore) sit in the header.
+Template, Sync All, and the power menu) sit in the header.
 
-![nvmon dashboard](NVMON/docs/screenshots/dashboard-home.png)
+![nvmon dashboard, grid view](NVMON/docs/screenshots/dashboard-home.png)
+
+The same fleet as a sortable list:
+
+![nvmon dashboard, list view](NVMON/docs/screenshots/dashboard-list.png)
+
+When a node loses Quadro Sync, its card turns red and an alert names it:
+
+![nvmon dashboard with a QSync Lost alert](NVMON/docs/screenshots/dashboard-alert.png)
+
+Click a node for its full view: QSync lock, outputs, profile validation,
+GPU telemetry, the display table, and restart / shutdown. Each card's power
+menu can also restart or shut down that machine.
+
+<p>
+  <img alt="nvmon per-node detail" src="NVMON/docs/screenshots/node-detail.png" width="62%">
+  <img alt="nvmon node power menu" src="NVMON/docs/screenshots/node-power-menu.png" width="34%">
+</p>
+
+<sub>Screenshots show the built-in demo fleet (`NVMON/nvmon/controller/dashboard_unified/fixtures/mock_status.json`, RN-01..RN-08), not a live site.</sub>
 
 Access is gated by a single shared password in
 `NVMON/secrets/controller.password`. Empty file → no-auth mode (with a
