@@ -285,7 +285,7 @@ F:\nvmon\
     controller\...
     launcher\...
 
-  bin\                   # NVIDIA CLI tools (download from NVIDIA; not in repo)
+  bin\                   # NVIDIA CLI tools (bundled; NVIDIA licence)
     configureMosaic.exe
     configureDdisplay.exe
     configureQsync2.exe

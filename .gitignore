@@ -154,11 +154,3 @@ NVMON/Run
 !NVMON/logs/.gitkeep
 !NVMON/bin/.gitkeep
 
-# ------------ NVIDIA CLI tools (NVMON/bin/) ------------
-# NVIDIA software under NVIDIA licence terms - not redistributed here.
-# Download from NVIDIA and drop in NVMON/bin/ (see README "Required NVIDIA tools").
-NVMON/bin/configureMosaic.exe
-NVMON/bin/configureMosaic-2.5.3.exe
-NVMON/bin/configureMosaic-2.5.3-readme.txt
-NVMON/bin/configureDdisplay.exe
-NVMON/bin/configureQsync2.exe

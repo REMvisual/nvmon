@@ -1,5 +1,5 @@
-"""The NVIDIA CLI tools are not shipped in the repo (NVIDIA
-licence). A node without them must boot, report each subsystem as
+"""The NVIDIA CLI tools ship in bin\\, but one can go missing. A node
+without them must boot, report each subsystem as
 unavailable with a message naming the file and where to put it, and never
 crash a status poll."""
 
@@ -45,7 +45,7 @@ def test_reason_names_file_and_bin_dir(no_nvidia_tools, name):
     reason = config.missing_exe_reason(name)
     assert reason.startswith(f"{name} not found")
     assert str(no_nvidia_tools) in reason
-    assert "NVIDIA" in reason and "Required NVIDIA tools" in reason
+    assert "NVIDIA" in reason and "Bundled NVIDIA tools" in reason
 
 
 @pytest.mark.parametrize("module,name", [

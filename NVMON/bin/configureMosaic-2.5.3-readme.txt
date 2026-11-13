@@ -1,0 +1,193 @@
+////////////////////////////////////////////////////////////////////////////////
+// configureMosaic Tool
+////////////////////////////////////////////////////////////////////////////////
+
+This tool is a command-line tool to query and configure Mosaic.
+It's designed to be usable from a script, so every command takes all of its
+arguments on the command line. The output of each command is written as XML to
+standard out.
+
+Currently, configureMosaic is only supported on windows-10 and above.
+
+Use of this tool implies agreement with the "NVIDIA Driver License Agreement".
+See the enclosed eula.txt document for the license text.
+
+===== Overview =====
+
+configureMosaic will indicate simple success or failure with its exit status:
+    0 -- Success.
+    1 -- Success, but with warnings.
+    2 -- The command or parameters are invalid.
+
+Any other value indicates an error.
+
+===== System Requirements =====
+
+configureMosaic is supported on Windows-10 and above 32 and 64 bit versions.
+
+Administrator privelges are required for most of the configureMosaic commands. 
+
+===== Configuring Mosaic =====
+
+To change the current Mosaic topology, use the "test" and "set" commands to
+specify one or more display grids:
+
+    configureMosaic <set|test> rows=NUM_ROWS cols=NUM_COLUMNS [passivestereo] [options...]
+
+The "set" command will apply one or more display grids. The list is exhaustive,
+so any display not given in one of the grids will be deactivated. The first
+grid will become the GDI primary, and any additional grids are arranged
+left-to-right after it.
+
+The "test" command will print the grids that it would set, but won't change
+anything. It will also verify that the grids are all valid, and will print the
+list of available resolutions for each grid.
+
+If the grids are not valid, then the "test" command will display the grids
+along with whatever errors it found, and exit with a status of 1.
+
+The "rows" and "cols" options specify the number of rows and columns in the
+grid. If the "passivestereo" option is given, then the grid will use passive
+stereo. To use a single display instead of a Mosaic topology, specify a grid
+with only one row and one column.
+
+To specify more than one grid, separate each grid with the option "nextgrid":
+
+    configureMosaic set rows=NUM_ROWS columns=NUM_COLUMNS nextgrid rows=...
+
+To set the resolution of the grid, use the "res" option. To set the overlap
+or bezel correction, use the "overlap", "overlapcol", and "overlaprow" options,
+or the "bezel", "bezelcol", and "bezelrow" options:
+
+    res=WIDTH,HEIGHT,REFRESH_RATE
+    overlap=COL,ROW
+    overlapcol=OVERLAP[,OVERLAP...]
+    overlaprow=OVERLAP[,OVERLAP...]
+    OR
+    bezel=COL,ROW
+    bezelcol=BEZEL[,BEZEL...]
+    bezelrow=BEZEL[,BEZEL...]
+
+The "res" option specifies the resolution and refresh rate of each display. If
+not specified, it will default to the highest available resolution. 
+
+
+Driver Version 370.04 onwards, user can pass the actual refresh rate, or they can pass the
+refresh rate rounded upto 2 digits after decimal, as is also shown by nvcpl.
+
+Eg1 : 
+       If supported rr=119.982
+       User passes rr=119.982 ,then Mosaic will be set with this referesh rate, 119.982
+      OR
+       If  supported rr=119.982
+       But user passes rr=119.98(rounded upto two digit after decimal[As shown by nvcpl also]), 
+       then also he will be able to set Mosaic with supported rr, ie; rr=119.982
+
+Eg2 :
+      Simalrly For Supported rr = 143.996->
+      Both 143.996 and 144([round(143.996) = 144.0] rounded upto 2 digit after decimal)   
+      will be allowed for user.   
+
+(Note: Here rr refers to refresh rate)
+
+
+
+The "overlapcol" and "overlaprow" options specify the overlap (if positive) or
+bezel correction (if negative) between each column and each row. You can
+specify a different overlap value for each row and column. Any overlaps that
+you do not specify will be zero.
+
+If you don't need different overlaps for each row and column, you can instead
+use the "overlap" option to specify a per-row and per-column overlap that
+applies to the entire grid.
+
+Bezel correction is equivalent to negative overlap. The "bezel", "bezelcol",
+and "bezelrow" options are equivalent to specifying a negative number to the 
+"overlap", "overlapcol", and "overlaprow" options, respectively.
+
+By default, configureMosaic will try to figure out which displays to assign to
+each grid. To specify a layout, use either the "out" or "display" options:
+
+    out=GPU_INDEX,OUTPUT_INDEX
+    display=DISPLAY_ID
+
+The "out" specifies a display by physical GPU and output index, and the
+"display" option specifies a display by its display ID. Use the "query" command
+to determine the available GPU's and displays.
+
+The displays are given in row-major order. A 2-row, 3-column grid, for example,
+would lay out its six displays in this order:
+
+    0 1 2
+    3 4 5
+
+For passive stereo mode, specify all the displays for the left eye, then the
+displays for the right eye. A 2-row, 2-column grid with passive stereo would
+lay out its displays like in this order:
+
+    Left eye:
+    0 1
+    2 3
+
+    Right eye:
+    4 5
+    6 7
+
+Note that configureMosaic doesn't support a partial list of displays. If you
+specify any display, then you must specify the entire layout for every grid.
+
+For Mosaic Topology, which spans across 2 RTX PRO Sync boards, 
+    1. By default configureMosaic sets the displays involved in mosaic grids in server-client config (one display will be server 
+       and rest will be in client mode)
+    2. If user sends "syncclient" flag while setting mosaic topology, configureMosaic sets the framelock in client config (all displays will be in client mode). 
+
+	Format: <set> <grid options> [nextgrid <grid options>] [syncclient]
+	Eg1: configureMosaic.exe set rows=1 cols=2 syncclient
+
+	3. By default swap barrier is enabled. To disable it, use "disablebarrier" flag while setting the mosaic topology.
+	
+	Format: <set> <grid options> [nextgrid <grid options>] [disablebarrier]
+	Eg1: configureMosaic.exe set rows=2 cols=2 disablebarrier	
+
+
+By default hardware video decode support is not present on 8-GPU (Mosaic with RTX PRO Sync system), because of lack of nodes (engines). If user sends "videodecode" flag while setting the topology, it enables the video decode support on 8 GPU(Mosaic with Sync system).
+
+Format: <set> <grid options> [nextgrid <grid options>] [videodecode]
+Eg1: configureMosaic.exe set rows=4 cols=8 videodecode
+
+In order to set a mosaic display as specialized, meaning that it is removed from Windows desktop, and is available for the third-party compositors to acquire and use for their specific use case, the user needs to send "ddisplay=1" flag while setting the topology. By default, ddisplay flag is set to 0.
+Note that ddisplay=1 is supported on Windows 11 and higher OS, and also results in an error if the operating system does not support third-party compositors.
+
+Format: <set> <grid options> [ddisplay=1]
+Eg1: configureMosaic.exe set rows=2 cols=4 ddisplay=1
+
+
+
+===== Querying Mosaic =====
+
+Use the "query" command to find the list of available GPU's and displays, and
+the current set of grids:
+
+    configureMosaic query [gpu] [lgpu] [current] [all]
+
+The "gpu" option will print the list of physical GPU's, and the displays
+attached to each GPU. Use this command to determine the indices or ID's of the
+displays to use for the "set" command.
+
+The "lgpu" option will print a list of available logical GPU's. Each logical
+GPU will have a list of supported features and a list of one or more physical
+GPUs.
+
+The "current" command will print the current display grids.
+
+The "all" command is equivalent to specifying "gpu", "lgpu", and "current".
+
+
+===== Other commands =====
+
+The "disable" command will disable Mosaic and return to a single display. It's
+equivalent to using the "set" command to apply a single 1x1 grid. It will use
+the first display of whichever grid is the GDI primary.
+
+The "help" command will display a list of all commands and options.
+

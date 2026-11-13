@@ -4,181 +4,211 @@
 
 # nvmon
 
-Monitoring and control daemon for NVIDIA Windows render nodes — agent /
-controller / launcher with a unified HTTP dashboard.
+**One dashboard for every NVIDIA render node you run.** See the whole fleet at a
+glance: Quadro Sync lock, Mosaic, Direct Display, refresh rate and GPU
+temperature on every machine. Push the same setup to all of them with one click.
 
-`nvmon` provides a single monitoring and fan-out control surface across a
-fleet of NVIDIA-equipped servers. It covers DirectDisplay, Mosaic, QSync,
-GPU telemetry, EDID, profile load/apply, and validation — exposed over
-HTTP and usable from a browser or from scripts.
+nvmon is free and open source (MIT) and runs on Windows. It's built for LED
+walls, projection rigs, media servers and render farms on NVIDIA RTX PRO /
+Quadro cards.
 
-> **The deployable product is in [`NVMON/`](NVMON/).** That folder is what
-> you copy to each render node and to the central monitor box. The repo
-> root only contains this README and `.gitignore`.
+---
 
-## Dashboard
+## What you get
 
-The controller exposes the unified fleet dashboard at `http://<monitor>:9997`.
-Every node appears as a card with live status, GPU telemetry, sync state,
-and per-node actions. Fan-out actions across the whole fleet (Re-apply All,
-Template, Sync All, and the power menu) sit in the header.
+**The whole fleet on one page.** Every render node is a card showing its
+profile, sync state (QS), Direct Display (DD), Mosaic (MOS), refresh rate and
+GPU temperature.
 
 ![nvmon dashboard, grid view](NVMON/docs/screenshots/dashboard-home.png)
 
-The same fleet as a sortable list:
+**Or as a list,** when you have a lot of nodes:
 
 ![nvmon dashboard, list view](NVMON/docs/screenshots/dashboard-list.png)
 
-When a node loses Quadro Sync, its card turns red and an alert names it:
+**Problems jump out.** When a node loses Quadro Sync, its card turns red and an
+alert names the node:
 
 ![nvmon dashboard with a QSync Lost alert](NVMON/docs/screenshots/dashboard-alert.png)
 
-Click a node for its full view: QSync lock, outputs, profile validation,
-GPU telemetry, the display table, and restart / shutdown. Each card's power
-menu can also restart or shut down that machine.
+**Click any node for everything about it:** sync lock, outputs, profile
+checks, GPU history, every display, and restart / shutdown buttons.
 
 <p>
   <img alt="nvmon per-node detail" src="NVMON/docs/screenshots/node-detail.png" width="62%">
   <img alt="nvmon node power menu" src="NVMON/docs/screenshots/node-power-menu.png" width="34%">
 </p>
 
-<sub>Screenshots show the built-in demo fleet (`NVMON/nvmon/controller/dashboard_unified/fixtures/mock_status.json`, RN-01..RN-08), not a live site.</sub>
+**Fleet-wide buttons** in the header:
 
-Access is gated by a single shared password in
-`NVMON/secrets/controller.password`. Empty file → no-auth mode (with a
-startup warning). Browsers see a login form; API clients send the password
-in the `X-NVMON-Password` header.
+- **Re-apply All:** every node re-applies its own saved display profile.
+- **Template:** switch the whole fleet to another profile set.
+- **Sync All:** re-lock Quadro Sync everywhere.
+- **Power menu:** restart or shut down machines.
 
-![nvmon login](NVMON/docs/screenshots/dashboard-login.png)
+**A mini monitor for your desktop.** The desktop app shrinks the dashboard into
+a small always-on-top ring. The ring shows nodes online, the fleet's refresh rate
+and colour depth. It's green when everything is in sync. Click it to open the
+full dashboard.
 
-## Quick start
+<sub>Screenshots use nvmon's built-in demo fleet (RN-01 to RN-08), not a live site.</sub>
+
+---
+
+## How it fits together
+
+There are two kinds of machine:
+
+| Machine | What runs there | How many |
+|---|---|---|
+| **Render node** | the **listener**: talks to the GPU and the NVIDIA tools | one per render machine |
+| **Monitor box** | the **monitor**: the dashboard you open in a browser | one for the whole fleet (can be any PC on the network) |
+
+The monitor finds the render nodes automatically on the local network. You can
+also list them by IP in `NVMON\nvmon.toml`.
+
+---
+
+## Install
+
+You need Windows 10/11, the NVIDIA driver, and internet access the first time
+(the installer downloads its own private copy of Python and touches nothing
+else on the system). Everything nvmon needs is in the `NVMON\` folder,
+**including the NVIDIA tools**. There's nothing extra to download.
+
+**1. Copy the `NVMON` folder** to each machine (git clone, USB stick or network
+share).
+
+**2. On each render node,** right-click → *Run as administrator*:
 
 ```cmd
-cd NVMON
-
-bats\install.bat --listener        :: render node, once, as administrator
-bats\install.bat --monitor         :: monitor box, once, as administrator
-
-run_listener.bat                   :: every render node — agent + launcher
-run_monitor.bat                    :: monitor box — controller + dashboard
+NVMON\bats\install.bat --listener
 ```
 
-`kill_listener.bat` / `kill_monitor.bat` are the safety-net stops.
+It sets up Python, opens the firewall ports and adds a startup task, so the
+listener runs at every logon.
 
-### Required NVIDIA tools
+**3. On the monitor box,** right-click → *Run as administrator*:
 
-Render nodes need three NVIDIA command-line utilities. **They are not in this
-repo**: they are NVIDIA software under NVIDIA's own licence terms. Download them from
-NVIDIA's enterprise / RTX professional (Quadro) driver tools pages and drop
-them in `NVMON\bin\`. Alternatively, set `NVMON_NVIDIA_TOOLS` to a folder that
-holds them before you run `install.bat`. `install.bat` warns up front about any
-that are missing. The agent still boots without them, and each missing tool's
-subsystem reports `available: false` with a message naming the file.
+```cmd
+NVMON\bats\install.bat --monitor
+```
 
-| File | NVIDIA utility | Tested version | SHA-256 of the copy we run |
+It asks for a dashboard password (leave it empty for no password) and puts an
+**nvmon Monitor** shortcut on the desktop.
+
+**4. Run it:**
+
+```cmd
+NVMON\run_listener.bat      :: on each render node (starts by itself after install)
+NVMON\run_monitor.bat       :: on the monitor box; opens the dashboard
+```
+
+The dashboard is at `http://<monitor-box>:9997`. To stop them, use
+`kill_listener.bat` / `kill_monitor.bat`.
+
+Re-running `install.bat` is safe. Use it to repair an install or change the
+password.
+
+### Desktop app and mini monitor (optional)
+
+On any Windows PC on the same network:
+
+```cmd
+NVMON\nvmon_app.bat
+```
+
+This opens the dashboard in its own window. Its ◉ button shrinks it into the
+mini monitor ring. The app starts with Windows (toggle it in the ring's
+right-click menu). No admin rights needed.
+
+### Updating an existing install
+
+From a newer copy of nvmon (for example a fresh clone), point at the installed
+folder:
+
+```cmd
+NVMON\update_site.bat E:\NVMON --dry-run   :: shows what would change
+NVMON\update_site.bat E:\NVMON             :: does it, asking before each step
+```
+
+It updates the code only. Your settings, passwords, profiles, EDIDs and logs
+are never touched, and every replaced file is backed up first.
+
+More detail: [`NVMON/README.md`](NVMON/README.md) (settings, presets, every
+script) and [`NVMON/docs/DEPLOYMENT.md`](NVMON/docs/DEPLOYMENT.md) (full
+install guide).
+
+---
+
+## Bundled NVIDIA tools
+
+nvmon drives three NVIDIA command-line utilities, which ship in `NVMON\bin\`:
+
+| File | What it controls | Version | SHA-256 |
 |---|---|---|---|
-| `configureMosaic.exe` | Mosaic Utility | 2.4.9 (per `docs/DEPLOYMENT.md`) | `9701e401f5a6535b599ae7538e3754394930661416dde844cf22737ed073220c` |
-| `configureMosaic-2.5.3.exe` | Mosaic Utility (optional, staged upgrade) | **2.5.3** | `ec2609399c9aa68c4ee14017a94552b8f8fa40e8a3f20240d535c4d1a2d93f68` |
-| `configureDdisplay.exe` | Direct Display configuration | 1.8.3405.878 | `b73920f75509fd7acbeb7367b5021e128033ef3fafbd6c69c41a5d88cf91805c` |
-| `configureQsync2.exe` | Quadro Sync configuration | 2.1.3339.3914 | `b220ec180d30ca9a238509e95965f7c60a2dee45c2349c474000d703d3168ce4` |
+| `configureMosaic.exe` | Mosaic (the version nvmon runs) | 2.4.9 | `9701e401f5a6535b599ae7538e3754394930661416dde844cf22737ed073220c` |
+| `configureMosaic-2.5.3.exe` | Mosaic, newer version (optional, see DEPLOYMENT.md) | 2.5.3 | `ec2609399c9aa68c4ee14017a94552b8f8fa40e8a3f20240d535c4d1a2d93f68` |
+| `configureDdisplay.exe` | Direct Display | 1.8.3405.878 | `b73920f75509fd7acbeb7367b5021e128033ef3fafbd6c69c41a5d88cf91805c` |
+| `configureQsync2.exe` | Quadro Sync | 2.1.3339.3914 | `b220ec180d30ca9a238509e95965f7c60a2dee45c2349c474000d703d3168ce4` |
 
-nvmon only looks up `configureMosaic.exe`. To run Mosaic 2.5.3, save it under
-that name (see `NVMON/docs/DEPLOYMENT.md`). Check a download with
-`certutil -hashfile <file> SHA256` (or PowerShell `Get-FileHash`).
-
-The prebuilt dashboard window **is** in the repo. Verify it the same way:
+The prebuilt desktop-app window is bundled too:
 
 | File | SHA-256 |
 |---|---|
 | `NVMON\bin\nvmon-window\nvmon-window.exe` | `0a9ece65404cdb15f6f23b972e9af57f5d42e00e4a923d9187fc21641b4e77db` |
 
-Its source and build script are in `NVMON\bin\nvmon-window\src\`. The WebView2
-DLLs next to it ship under Microsoft's redistribution licence
-(`WebView2-LICENSE.txt`).
+To check a file, run `certutil -hashfile <file> SHA256`. If a tool goes
+missing, nvmon keeps running: that feature just shows as unavailable, and the
+installer tells you which file is missing.
 
-### Desktop app (any Windows machine on the control network)
+---
 
-```cmd
-nvmon_app.bat                      :: or: python\python.exe -m nvmon app
-python\python.exe -m nvmon app --shortcuts   :: 'nvmon' on the desktop + in NVMON\
-```
+## For developers
 
-A borderless, resizable dashboard window (`bin\nvmon-window\`, WebView2 —
-built into Windows 10/11, nothing to install) with its own local controller.
-The header is the title bar; its ◉ button collapses everything into a small
-floating widget: sync ring (green = all nodes online and in sync), refresh
-rate, colour depth, and a reopen button. Starts with Windows (toggle in the
-widget's right-click menu).
+**The parts and their ports:**
 
-### Updating an existing site
+| Part | Port | Login | Runs on |
+|---|---|---|---|
+| `agent` | 9998 | none (trusted network) | each render node |
+| `launcher` | 9996 | none | each render node (optional) |
+| `controller` | 9997 | one shared password | the monitor box |
 
-From a newer copy (e.g. a fresh clone), point it at the existing install:
+- **The agent** talks to the hardware through `nvidia-smi` and the NVIDIA tools
+  above.
+- **The launcher** starts and supervises your show apps alongside nvmon.
+- **The listener** runs the agent and launcher together.
+- **The controller** polls every agent, serves the dashboard and sends commands
+  to the whole fleet.
 
-```cmd
-update_site.bat E:\NVMON --dry-run   :: show the plan first
-update_site.bat E:\NVMON             :: 1) monitor only  2) monitor + listeners  3) listener
-```
+Design docs are in [`NVMON/docs/`](NVMON/docs/).
 
-Code only: `nvmon.toml`, secrets, profiles, EDIDs and logs are never touched;
-every replaced file is backed up with a `ROLLBACK.txt`; each step says
-whether it is safe, a brief restart, or changes files before asking.
-
-See [`NVMON/README.md`](NVMON/README.md) for the full product overview,
-manual IP configuration (`nvmon.toml`), preset sync, redeploy, and the
-complete catalog of batch scripts.
-
-## Architecture
-
-| Role         | Port | Auth                | Per machine        |
-|--------------|------|---------------------|--------------------|
-| `agent`      | 9998 | none (trusted LAN)  | one per node       |
-| `controller` | 9997 | one shared password | one for the fleet  |
-| `launcher`   | 9996 | none                | optional, per node |
-| `listener`   | —    | n/a (supervisor)    | spawns agent + launcher together |
-
-- The **agent** owns the local hardware — shells out to `nvidia-smi`,
-  `configureMosaic.exe`, `configureDdisplay.exe`, `configureQsync2.exe`.
-- The **controller** polls every agent, aggregates `/status` + `/health`,
-  and fans out commands across the fleet.
-- The **launcher** is a generic process supervisor for production apps that
-  need to be tied to nvmon's lifecycle.
-- The **listener** is a convenience supervisor that spawns `agent` and
-  `launcher` together in one console.
-
-Architecture and design specs live in [`NVMON/docs/`](NVMON/docs/).
-
-## Testing
+**Tests:**
 
 ```cmd
 cd NVMON
-python\python.exe -m pytest                     :: full suite
-python\python.exe -m pytest tests/unit          :: unit only
-python\python.exe -m pytest tests/smoke         :: smoke (requires a running controller)
+python\python.exe -m pytest tests/unit      :: unit tests
+python\python.exe -m pytest                 :: everything (smoke tests need a running controller)
 ```
 
-## Threat model
+**Security model.** nvmon assumes a private render network, not the internet.
+The agent and launcher have no login. The dashboard has one shared password,
+kept in `NVMON\secrets\controller.password`; scripts send it in the
+`X-NVMON-Password` header. There's no TLS and there are no per-user accounts.
 
-- The agent and launcher are **unauthenticated** by design — the assumption
-  is a private render subnet, not the public internet.
-- The controller is the only authenticated surface. One shared password in
-  `NVMON/secrets/controller.password`, sent via the `X-NVMON-Password`
-  header or a session cookie from the login page.
-- Out of scope for the current wave: TLS, per-user accounts, session
-  timeouts, audit logs.
+---
 
 ## License
 
-nvmon is released under the [MIT License](LICENSE).
+nvmon is released under the [MIT License](LICENSE). Bundled third-party parts
+keep their own licences:
 
-Third-party components keep their own licences:
-
-- **NVIDIA CLI tools** (`configureMosaic.exe`, `configureDdisplay.exe`,
-  `configureQsync2.exe`) are NVIDIA software and are **not included**. Get
-  them from NVIDIA (see [Required NVIDIA tools](#required-nvidia-tools)).
-- **WebView2** runtime DLLs in `NVMON/bin/nvmon-window/` are Microsoft's,
-  redistributed under `WebView2-LICENSE.txt`.
-- **htmx, Alpine.js and Chart.js** in
-  `NVMON/nvmon/controller/dashboard_unified/static/vendor/` are under their
-  upstream projects' licences.
-- The enclosed Python runtime and pip packages, which `install.bat` downloads
-  at install time, are covered by their own licences.
+- **NVIDIA tools** in `NVMON/bin/`: NVIDIA software under NVIDIA's own licence
+  terms (not MIT).
+- **WebView2** DLLs in `NVMON/bin/nvmon-window/`: Microsoft, under
+  `WebView2-LICENSE.txt`.
+- **htmx, Alpine.js, Chart.js** in
+  `NVMON/nvmon/controller/dashboard_unified/static/vendor/`: their own
+  projects' licences.
+- **Python** and its packages, downloaded by the installer: their own
+  licences.

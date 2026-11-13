@@ -62,8 +62,7 @@ set "PY_EMBED_URL=https://www.python.org/ftp/python/%PY_VERSION%/python-%PY_VERS
 set "GETPIP_URL=https://bootstrap.pypa.io/get-pip.py"
 REM Optional: a folder that already holds configureMosaic/Ddisplay/Qsync2.exe
 REM (e.g. an older tool's install). Set NVMON_NVIDIA_TOOLS before running to
-REM have the installer copy them into bin\; unset = skip. The repo does NOT
-REM ship them - download them from NVIDIA and drop them in bin\.
+REM have the installer copy them into bin\; unset = skip (bin\ ships them).
 set "NVIDIA_SRC=%NVMON_NVIDIA_TOOLS%"
 
 REM ----- Parse args ---------------------------------------------------------
@@ -108,9 +107,9 @@ echo ============================================================
 echo.
 
 REM ----- NVIDIA CLI tools preflight (warning only) --------------------------
-REM These exes are NOT in the repo: they are NVIDIA software under NVIDIA's
-REM own licence terms. The listener needs them; the monitor does not. Warn up
-REM front so a missing tool is obvious before anything is installed.
+REM These exes ship in bin\ (NVIDIA software, NVIDIA licence terms). The
+REM listener needs them; the monitor does not. Warn up front if one has gone
+REM missing, so it is obvious before anything is installed.
 set "NV_MISSING="
 for %%E in (configureMosaic.exe configureDdisplay.exe configureQsync2.exe) do (
     if not exist "%BIN_DIR%\%%E" (
@@ -123,13 +122,12 @@ if defined NV_MISSING (
     echo WARNING: NVIDIA CLI tools missing from %BIN_DIR%\:
     for %%E in (!NV_MISSING!) do echo            %%E
     echo.
-    echo   nvmon does not ship these ^(NVIDIA licence terms^). Download them from NVIDIA:
-    echo     configureMosaic.exe   - NVIDIA Mosaic Utility ^(tested 2.5.3^)
+    echo   These normally ship in bin\. Restore them from the nvmon repo:
+    echo     configureMosaic.exe   - NVIDIA Mosaic Utility
     echo     configureDdisplay.exe - NVIDIA Direct Display configuration utility
     echo     configureQsync2.exe   - NVIDIA Quadro Sync configuration utility
-    echo   from NVIDIA's enterprise / RTX professional ^(Quadro^) driver tools
-    echo   pages, and drop them in bin\ ^(or set NVMON_NVIDIA_TOOLS to a folder
-    echo   that holds them^). See README "Required NVIDIA tools" for SHA-256s.
+    echo   or copy your own into bin\ ^(or set NVMON_NVIDIA_TOOLS to a folder
+    echo   that holds them^). See README "Bundled NVIDIA tools" for SHA-256s.
     echo   The agent still runs without them; those subsystems report unavailable.
     echo.
 )
@@ -424,7 +422,7 @@ if defined NVIDIA_SRC if exist "%NVIDIA_SRC%\%EXE_NAME%" (
         exit /b 0
     )
 )
-echo       [MISSING] %EXE_NAME% - download it from NVIDIA and drop it in bin\ ^(see README "Required NVIDIA tools"^)
+echo       [MISSING] %EXE_NAME% - restore it to bin\ from the nvmon repo ^(see README "Bundled NVIDIA tools"^)
 exit /b 0
 
 :fw_tcp

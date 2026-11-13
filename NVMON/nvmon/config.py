@@ -572,7 +572,7 @@ def _find_exe(name: str, override: str = "") -> str:
 
     Resolution order:
       1. Explicit override path from config (if file exists).
-      2. BIN_DIR / name (operator-downloaded copy in bin\).
+      2. BIN_DIR / name (bundled copy in bin\).
       3. BASE_DIR / name (legacy layout).
       4. PATH lookup.
     """
@@ -597,10 +597,10 @@ def _find_exe(name: str, override: str = "") -> str:
     return ""
 
 
-# These tools are NVIDIA software under NVIDIA's licence terms and are not in
-# the repo. The operator downloads them from NVIDIA and drops them in bin\.
+# These tools are NVIDIA software (NVIDIA licence terms) and ship in bin\.
+# If one has gone missing, say where it goes and what it is.
 NVIDIA_TOOL_SOURCES = {
-    "configureMosaic.exe": "NVIDIA Mosaic Utility (configureMosaic, tested 2.5.3)",
+    "configureMosaic.exe": "NVIDIA Mosaic Utility (configureMosaic)",
     "configureDdisplay.exe": "NVIDIA Direct Display configuration utility (configureDdisplay)",
     "configureQsync2.exe": "NVIDIA Quadro Sync configuration utility (configureQsync2)",
 }
@@ -614,10 +614,9 @@ def missing_exe_reason(name: str) -> str:
     """
     source = NVIDIA_TOOL_SOURCES.get(name, "NVIDIA's enterprise driver tools")
     return (
-        f"{name} not found - place it in {BIN_DIR} (or set the [agent.bin] "
-        f"override in nvmon.toml). Download: {source}, from NVIDIA's "
-        f"enterprise / RTX professional (Quadro) driver tools pages. "
-        f"See README 'Required NVIDIA tools'."
+        f"{name} not found - it ships in {BIN_DIR}; restore it from the nvmon "
+        f"repo (or set the [agent.bin] override in nvmon.toml). It is the "
+        f"{source} from NVIDIA. See README 'Bundled NVIDIA tools'."
     )
 
 

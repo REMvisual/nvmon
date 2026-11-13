@@ -109,7 +109,7 @@ excluded_resolutions = [[1920, 1080]]
 
 Override NVIDIA CLI tool paths. Leave a value empty and nvmon searches:
 
-1. `F:\nvmon\bin\<name>.exe` (the copy you downloaded from NVIDIA)
+1. `F:\nvmon\bin\<name>.exe` (the bundled copy)
 2. `F:\nvmon\<name>.exe` (legacy layout)
 3. `PATH`
 

@@ -34,13 +34,13 @@ Everything below assumes a Windows 10/11 machine with an Administrator account.
 
 Additional on render nodes only:
 - **NVIDIA drivers** installed (`nvidia-smi` resolvable on `PATH`).
-- NVIDIA CLI tools (`configureMosaic.exe`, `configureDdisplay.exe`, `configureQsync2.exe`). See [Required NVIDIA tools](#required-nvidia-tools) below.
+- NVIDIA CLI tools (`configureMosaic.exe`, `configureDdisplay.exe`, `configureQsync2.exe`). They ship in `bin\`; see [Bundled NVIDIA tools](#bundled-nvidia-tools) below.
 
-### Required NVIDIA tools
+### Bundled NVIDIA tools
 
-These are **not in the repo**: they are NVIDIA software under NVIDIA's own licence terms, so nvmon does not redistribute them. Download the Mosaic Utility, the Direct Display configuration utility and the Quadro Sync configuration utility from NVIDIA's enterprise / RTX professional (Quadro) driver tools pages, and drop the exes in `F:\nvmon\bin\`. If a folder already holds them (e.g. an older tool's install), set `NVMON_NVIDIA_TOOLS=<folder>` before running `install.bat` and it copies them into `bin\`.
+These **ship with nvmon** in `bin\` (NVIDIA software, covered by NVIDIA's own licence terms), so copying the tree to `F:\nvmon\` is all you need. To use your own copies, drop them in `F:\nvmon\bin\`, or set `NVMON_NVIDIA_TOOLS=<folder>` before running `install.bat` and it copies them into `bin\`.
 
-`install.bat` prints a warning before anything else runs if any of them is missing from `bin\`. A missing tool does not stop the agent. That subsystem reports `available: false` in `/health`, with a reason naming the file and the `bin\` path, and the rest keep working.
+If one has gone missing, `install.bat` prints a warning before anything else runs. A missing tool does not stop the agent. That subsystem reports `available: false` in `/health`, with a reason naming the file and the `bin\` path, and the rest keep working.
 
 | File | NVIDIA utility | Tested version | SHA-256 of the copy we run |
 |---|---|---|---|
@@ -203,8 +203,7 @@ sync role are all discovered.
   `out=GPU,OUTPUT`, so both 2.4.9 and 2.5.3 work. Our fleet stages the
   signed 2.5.3 binary as `bin\configureMosaic-2.5.3.exe` (NVIDIA
   Authenticode signature verified, SHA-256
-  `ec2609399c9aa68c4ee14017a94552b8f8fa40e8a3f20240d535c4d1a2d93f68`; not
-  in the repo, see [Required NVIDIA tools](#required-nvidia-tools)).
+  `ec2609399c9aa68c4ee14017a94552b8f8fa40e8a3f20240d535c4d1a2d93f68`).
   To switch the fleet: rename the 2.4.9 `configureMosaic.exe` to
   `configureMosaic-2.4.9.exe`, copy `configureMosaic-2.5.3.exe` to
   `configureMosaic.exe`, run `configureMosaic.exe query current` on one node

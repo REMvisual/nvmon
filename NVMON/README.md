@@ -232,7 +232,7 @@ agent).
 NVMON\
 ├── nvmon\                  Python package (agent / controller / launcher)
 ├── python\                 Enclosed embedded Python (created by install)
-├── bin\                    NVIDIA CLI utilities (download from NVIDIA; not in repo)
+├── bin\                    NVIDIA CLI utilities (bundled; NVIDIA licence)
 ├── profiles\               Editable profile library (one *.json per preset)
 ├── Edids\                  Operator-dropped EDID overrides (.txt / .bin / .dat)
 ├── secrets\                Password file (owner-only ACL)
